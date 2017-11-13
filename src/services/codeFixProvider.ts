@@ -3,29 +3,47 @@ namespace ts {
     export interface CodeFix {
         errorCodes: number[];
         getCodeActions(context: CodeFixContext): CodeAction[] | undefined;
+        groupIds?: string[];
+        fixAllInGroup?(context: CodeFixAllContext): CodeActionAll;
+        //TODO: nonOptional
     }
 
-    export interface CodeFixContext extends textChanges.TextChangesContext {
-        errorCode: number;
+    //name
+    export interface CodeFixContextBase extends textChanges.TextChangesContext {
         sourceFile: SourceFile;
-        span: TextSpan;
         program: Program;
         host: LanguageServiceHost;
         cancellationToken: CancellationToken;
     }
 
+    export interface CodeFixAllContext extends CodeFixContextBase {
+        groupId: string;
+    }
+
+    export interface CodeFixContext extends CodeFixContextBase {
+        errorCode: number;
+        span: TextSpan;
+    }
+
     export namespace codefix {
         const codeFixes: CodeFix[][] = [];
+        const groups = createMap<CodeFix>();
 
         export function registerCodeFix(codeFix: CodeFix) {
-            forEach(codeFix.errorCodes, error => {
+            for (const error of codeFix.errorCodes) {
                 let fixes = codeFixes[error];
                 if (!fixes) {
                     fixes = [];
                     codeFixes[error] = fixes;
                 }
                 fixes.push(codeFix);
-            });
+            }
+            if (codeFix.groupIds) {
+                for (const gid of codeFix.groupIds) {
+                    Debug.assert(!groups.has(gid));
+                    groups.set(gid, codeFix);
+                }
+            }
         }
 
         export function getSupportedErrorCodes() {
@@ -52,5 +70,57 @@ namespace ts {
 
             return allActions;
         }
+
+        export function getAllFixes(context: CodeFixAllContext): CodeActionAll {
+            const fix = groups.get(context.groupId); //inline
+            return fix.fixAllInGroup!(context);
+        }
+    }
+
+    //!
+    export function createCodeActionAll(changes: FileTextChanges[], commands?: CodeActionCommand[]): CodeActionAll { //mv
+        return { changes, commands };
+    }
+
+    export function createFileTextChanges(fileName: string, textChanges: TextChange[]): FileTextChanges { //reuse
+        return { fileName, textChanges };
+    }
+
+    //apply in reverse order so line info isn't effected by previous changes.
+    //dup?
+    export function sortTextChanges(changes: TextChange[]): TextChange[] {//reuse
+        return changes.sort((a, b) => b.span.start - a.span.start);
+    }
+
+    //mv
+    export function fixAllSimple(context: CodeFixAllContext, errorCodes: number[], getCodeAction: (context: CodeFixContext) => { changes: ReadonlyArray<FileTextChanges>, commands?: ReadonlyArray<CodeActionCommand> } | undefined): CodeActionAll {
+        const errors = context.program.getSemanticDiagnostics();
+        const allChanges = createMultiMap<TextChange>(); // file to changes
+        let allCommands: CodeActionCommand[] | undefined;
+        for (const error of errors) {
+            if (contains(errorCodes, error.code)) {
+                Debug.assert(error.start !== undefined && error.length !== undefined);
+                const { changes, commands } = getCodeAction({
+                    formatContext: context.formatContext,
+                    newLineCharacter: context.newLineCharacter,
+                    sourceFile: context.sourceFile,
+                    program: context.program,
+                    host: context.host,
+                    cancellationToken: context.cancellationToken,
+                    errorCode: error.code,
+                    span: ts.createTextSpan(error.start!, error.length!),
+                });
+                for (const change of changes) {
+                    allChanges.addMany(change.fileName, change.textChanges);
+                }
+                allCommands = addRange(allCommands, commands);
+            }
+        }
+        return { changes: mapIter(allChanges.entries(), ([fileName, changes]) => ({ fileName, textChanges: sortTextChanges(changes) })), commands: allCommands };
+    }
+
+    //!
+    export function makeSingle<T>(t: T | undefined): T[] {
+        return t === undefined ? undefined : [t];
     }
 }

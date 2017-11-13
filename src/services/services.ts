@@ -1887,6 +1887,15 @@ namespace ts {
             });
         }
 
+        function getAllCodeFixesInGroup(fileName: string, groupId: string, formatOptions: FormatCodeSettings): CodeActionAll {
+            synchronizeHostData();
+            const sourceFile = getValidSourceFile(fileName);
+            const newLineCharacter = getNewLineOrDefaultFromHost(host);
+            const formatContext = formatting.getFormatContext(formatOptions);
+
+            return codefix.getAllFixes({ groupId, sourceFile, program, newLineCharacter, host, cancellationToken, formatContext });
+        }
+
         function applyCodeActionCommand(action: CodeActionCommand): Promise<ApplyCodeActionCommandResult>;
         function applyCodeActionCommand(action: CodeActionCommand[]): Promise<ApplyCodeActionCommandResult[]>;
         function applyCodeActionCommand(action: CodeActionCommand | CodeActionCommand[]): Promise<ApplyCodeActionCommandResult | ApplyCodeActionCommandResult[]>;
@@ -2181,6 +2190,7 @@ namespace ts {
             isValidBraceCompletionAtPosition,
             getSpanOfEnclosingComment,
             getCodeFixesAtPosition,
+            getAllCodeFixesInGroup,
             applyCodeActionCommand,
             getEmitOutput,
             getNonBoundSourceFile,

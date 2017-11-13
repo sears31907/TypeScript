@@ -2424,8 +2424,18 @@ Actual: ${stringify(fullActual)}`);
             this.verifyRangeIs(expectedText, includeWhiteSpace);
         }
 
+        public verifyCodeFixAll(options: FourSlashInterface.VerifyCodeFixAllOptions): void {
+            const { groupId, newFileContent } = options;
+            const groupIds = ts.mapDefined(this.getCodeFixActions(this.activeFile.fileName), a => a.groupId);
+            ts.Debug.assert(ts.contains(groupIds, groupId), "No available code fix has that group id.", () => `Expected '${groupId}'. Available group ids: ${groupIds}`);
+            const { changes, commands } = this.languageService.getAllCodeFixesInGroup(this.activeFile.fileName, groupId, this.formatCodeSettings);
+            ts.Debug.assert(!commands, "TODO");
+            this.applyChanges(changes);
+            this.verifyCurrentFileContent(newFileContent);
+        }
+
         /**
-         * Applies fixes for the errors in fileName and compares the results to
+         * Applies fixes for the . in fileName and compares the results to
          * expectedContents after all fixes have been applied.
          *
          * Note: applying one codefix may generate another (eg: remove duplicate implements
@@ -2501,7 +2511,7 @@ Actual: ${stringify(fullActual)}`);
             });
         }
 
-        private applyCodeActions(actions: ts.CodeAction[], index?: number): void {
+        private applyCodeActions(actions: ReadonlyArray<ts.CodeAction>, index?: number): void {
             if (index === undefined) {
                 if (!(actions && actions.length === 1)) {
                     this.raiseError(`Should find exactly one codefix, but ${actions ? actions.length : "none"} found. ${actions ? actions.map(a => `${Harness.IO.newLine()} "${a.description}"`) : ""}`);
@@ -2514,8 +2524,10 @@ Actual: ${stringify(fullActual)}`);
                 }
             }
 
-            const changes = actions[index].changes;
+            this.applyChanges(actions[index].changes);
+        }
 
+        private applyChanges(changes: ReadonlyArray<ts.FileTextChanges>): void {
             for (const change of changes) {
                 this.applyEdits(change.fileName, change.textChanges, /*isFormattingEdit*/ false);
             }
@@ -4143,6 +4155,10 @@ namespace FourSlashInterface {
             this.state.verifyRangeAfterCodeFix(expectedText, includeWhiteSpace, errorCode, index);
         }
 
+        public codeFixAll(options: VerifyCodeFixAllOptions): void {
+            this.state.verifyCodeFixAll(options);
+        }
+
         public fileAfterApplyingRefactorAtMarker(markerName: string, expectedContent: string, refactorNameToApply: string, actionName: string, formattingOptions?: ts.FormatCodeSettings): void {
             this.state.verifyFileAfterApplyingRefactorAtMarker(markerName, expectedContent, refactorNameToApply, actionName, formattingOptions);
         }
@@ -4576,6 +4592,11 @@ namespace FourSlashInterface {
     export interface VerifyCodeFixAvailableOptions {
         description: string;
         commands?: ts.CodeActionCommand[];
+    }
+
+    export interface VerifyCodeFixAllOptions {
+        groupId: string,
+        newFileContent: string,
     }
 
     export interface VerifyRefactorOptions {

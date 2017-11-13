@@ -283,6 +283,7 @@ declare namespace FourSlashInterface {
         docCommentTemplateAt(markerName: string | FourSlashInterface.Marker, expectedOffset: number, expectedText: string): void;
         noDocCommentTemplateAt(markerName: string | FourSlashInterface.Marker): void;
         rangeAfterCodeFix(expectedText: string, includeWhiteSpace?: boolean, errorCode?: number, index?: number): void;
+        codeFixAll(options: { groupId: string, newFileContent: string }): void;
         fileAfterApplyingRefactorAtMarker(markerName: string, expectedContent: string, refactorNameToApply: string, actionName: string, formattingOptions?: FormatCodeOptions): void;
         rangeIs(expectedText: string, includeWhiteSpace?: boolean): void;
         fileAfterApplyingRefactorAtMarker(markerName: string, expectedContent: string, refactorNameToApply: string, formattingOptions?: FormatCodeOptions): void;

@@ -561,6 +561,10 @@ namespace ts.server {
             return response.body.map(entry => this.convertCodeActions(entry, file));
         }
 
+        getAllCodeFixesInGroup(): CodeActionAll {
+            throw new Error("TODO");
+        }
+
         applyCodeActionCommand = notImplemented;
 
         private createFileLocationOrRangeRequestArgs(positionOrRange: number | TextRange, fileName: string): protocol.FileLocationOrRangeRequestArgs {
