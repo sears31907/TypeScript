@@ -1,20 +1,17 @@
 /* @internal */
 namespace ts.codefix {
-    const ignoreGroupId = "ignore";
+    const groupId = "disableJsDiagnostics";
+    const allDiagnostcs = <MapLike<DiagnosticMessage>>Diagnostics;
+    const errorCodes = Object.keys(allDiagnostcs)
+        .filter(d => allDiagnostcs[d] && allDiagnostcs[d].category === DiagnosticCategory.Error)
+        .map(d => allDiagnostcs[d].code);
 
     registerCodeFix({
-        errorCodes: getApplicableDiagnosticCodes(),
+        errorCodes,
         getCodeActions: getDisableJsDiagnosticsCodeActions,
-        groupIds: [ignoreGroupId], // No point applying as a group, doing it once will fix all errors
+        groupIds: [groupId], // No point applying as a group, doing it once will fix all errors
         fixAllInGroup,
     });
-
-    function getApplicableDiagnosticCodes(): number[] {
-        const allDiagnostcs = <MapLike<DiagnosticMessage>>Diagnostics;
-        return Object.keys(allDiagnostcs)
-            .filter(d => allDiagnostcs[d] && allDiagnostcs[d].category === DiagnosticCategory.Error)
-            .map(d => allDiagnostcs[d].code);
-    }
 
     function getIgnoreCommentLocationForLocation(sourceFile: SourceFile, position: number, newLineCharacter: string): TextChange {
         const { line } = getLineAndCharacterOfPosition(sourceFile, position);
@@ -53,7 +50,7 @@ namespace ts.codefix {
         return [{
             description: getLocaleSpecificMessage(Diagnostics.Ignore_this_error_message),
             changes: [createFileTextChanges(sourceFile.fileName, [getIgnoreCommentLocationForLocation(sourceFile, span.start, newLineCharacter)])],
-            groupId: ignoreGroupId,
+            groupId,
         },
         {
             description: getLocaleSpecificMessage(Diagnostics.Disable_checking_for_this_file),
@@ -68,10 +65,8 @@ namespace ts.codefix {
     }
 
     function fixAllInGroup(context: CodeFixAllContext): CodeActionAll {
-        const { groupId, newLineCharacter, program, sourceFile } = context;
-        Debug.assertEqual(groupId, ignoreGroupId);
-        const errors = program.getSemanticDiagnostics(); //todo: get other diagnostics?
-        const changes = sortTextChanges(mapDefined(errors, error =>
+        const { newLineCharacter, program, sourceFile } = context;
+        const changes = sortTextChanges(mapDefined(errorsIter(program, sourceFile, errorCodes), error =>
             error.start === undefined || error.length === undefined ? undefined : getIgnoreCommentLocationForLocation(sourceFile, error.start, newLineCharacter)));
         return createCodeActionAll([createFileTextChanges(sourceFile.fileName, changes)]);
     }

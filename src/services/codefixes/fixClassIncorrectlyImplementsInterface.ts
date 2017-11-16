@@ -1,5 +1,6 @@
 /* @internal */
 namespace ts.codefix {
+    //todo: group
     registerCodeFix({
         errorCodes: [Diagnostics.Class_0_incorrectly_implements_interface_1.code],
         getCodeActions: getActionForClassLikeIncorrectImplementsInterface

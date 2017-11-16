@@ -1,5 +1,6 @@
 /* @internal */
 namespace ts.codefix {
+    //todo: group
     registerCodeFix({
         errorCodes: [Diagnostics.Property_0_does_not_exist_on_type_1_Did_you_mean_2.code,
                      Diagnostics.Cannot_find_name_0_Did_you_mean_1.code],

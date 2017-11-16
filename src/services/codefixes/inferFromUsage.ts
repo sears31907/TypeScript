@@ -1,5 +1,6 @@
 /* @internal */
 namespace ts.codefix {
+    //todo: group
     registerCodeFix({
         errorCodes: [
             // Variable declarations

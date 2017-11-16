@@ -2429,13 +2429,13 @@ Actual: ${stringify(fullActual)}`);
             const groupIds = ts.mapDefined(this.getCodeFixActions(this.activeFile.fileName), a => a.groupId);
             ts.Debug.assert(ts.contains(groupIds, groupId), "No available code fix has that group id.", () => `Expected '${groupId}'. Available group ids: ${groupIds}`);
             const { changes, commands } = this.languageService.getAllCodeFixesInGroup(this.activeFile.fileName, groupId, this.formatCodeSettings);
-            ts.Debug.assert(!commands, "TODO");
+            assert.deepEqual(commands, options.commands);
             this.applyChanges(changes);
             this.verifyCurrentFileContent(newFileContent);
         }
 
         /**
-         * Applies fixes for the . in fileName and compares the results to
+         * Applies fixes for the errors in fileName and compares the results to
          * expectedContents after all fixes have been applied.
          *
          * Note: applying one codefix may generate another (eg: remove duplicate implements
@@ -4597,6 +4597,7 @@ namespace FourSlashInterface {
     export interface VerifyCodeFixAllOptions {
         groupId: string,
         newFileContent: string,
+        commands: {}[],
     }
 
     export interface VerifyRefactorOptions {

@@ -88,6 +88,7 @@ namespace ts {
 
     //apply in reverse order so line info isn't effected by previous changes.
     //dup?
+    //kill?
     export function sortTextChanges(changes: TextChange[]): TextChange[] {//reuse
         return changes.sort((a, b) => b.span.start - a.span.start);
     }
@@ -122,5 +123,19 @@ namespace ts {
     //!
     export function makeSingle<T>(t: T | undefined): T[] {
         return t === undefined ? undefined : [t];
+    }
+
+    //name
+    export function iterateErrorsForCodeActionAll(context: CodeFixAllContext, errorCodes: number[], use: (changes: textChanges.ChangeTracker, error: Diagnostic) => void): CodeActionAll {
+        return createCodeActionAll(textChanges.ChangeTracker.with(context, t => {
+            for (const error of errorsIter(context.program, context.sourceFile, errorCodes)) {
+                use(t, error); //neater
+            }
+        }));
+    }
+
+    //!
+    export function errorsIter(program: Program, sourceFile: SourceFile, errorCodes: number[]): Diagnostic[] { //todo: iterator
+        return program.getSemanticDiagnostics().filter(error => contains(errorCodes, error.code) && error.file === sourceFile);
     }
 }

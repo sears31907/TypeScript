@@ -1,5 +1,6 @@
 /* @internal */
 namespace ts.codefix {
+    //todo: group
     registerCodeFix({
         errorCodes: [Diagnostics.JSDoc_types_can_only_be_used_inside_documentation_comments.code],
         getCodeActions: getActionsForJSDocTypes

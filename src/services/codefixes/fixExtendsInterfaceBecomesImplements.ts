@@ -1,5 +1,6 @@
 /* @internal */
 namespace ts.codefix {
+    //todo: group
     registerCodeFix({
         errorCodes: [Diagnostics.Cannot_extend_an_interface_0_Did_you_mean_implements.code],
         getCodeActions: (context: CodeFixContext) => {

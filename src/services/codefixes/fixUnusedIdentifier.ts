@@ -1,5 +1,6 @@
 /* @internal */
 namespace ts.codefix {
+    //todo: group
     registerCodeFix({
         errorCodes: [
             Diagnostics._0_is_declared_but_its_value_is_never_read.code,

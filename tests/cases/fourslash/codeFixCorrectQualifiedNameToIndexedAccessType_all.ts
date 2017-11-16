@@ -9,6 +9,9 @@
 verify.codeFixAll({
     groupId: "correctQualifiedNameToIndexedAccessType",
     newFileContent:
-`
-`,
+`interface Foo {
+    bar: string;
+}
+const x: Foo["bar"] = "";
+const y: Foo["bar"] = "";`,
 });
