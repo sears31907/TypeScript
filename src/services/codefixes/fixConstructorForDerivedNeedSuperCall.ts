@@ -4,7 +4,7 @@ namespace ts.codefix {
     const errorCodes = [Diagnostics.Constructors_for_derived_classes_must_contain_a_super_call.code];
     registerCodeFix({
         errorCodes,
-        getCodeActions: (context: CodeFixContext) => {
+        getCodeActions: context => {
             const { sourceFile } = context;
             const ctr = getNode(sourceFile, context.span.start);
             const changes = textChanges.ChangeTracker.with(context, t => doChange(t, sourceFile, ctr, context.newLineCharacter));
