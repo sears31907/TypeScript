@@ -25,7 +25,18 @@ namespace ts.codefix {
     registerCodeFix({
         errorCodes,
         getCodeActions: ({ sourceFile, program, span: { start }, errorCode, cancellationToken }) => {
-            return f(sourceFile, start, errorCode, program, cancellationToken);
+            if (isSourceFileJavaScript(sourceFile)) {
+                return undefined; // TODO: GH#20113
+            }
+
+            const token = getTokenAtPosition(sourceFile, start, /*includeJsDocComment*/ false);
+            const fix = getFix(sourceFile, token, errorCode, program, cancellationToken);
+            if (!fix) return undefined;
+
+            const { declaration, textChanges } = fix;
+            const name = getNameOfDeclaration(declaration);
+            const description = formatStringFromArgs(getLocaleSpecificMessage(getDiagnostic(errorCode, token)), [name.getText()]);
+            return [{ description, changes: [{ fileName: sourceFile.fileName, textChanges }], groupId }];
         },
         groupIds: [groupId],
         fixAllInGroup: _context => {
@@ -33,56 +44,21 @@ namespace ts.codefix {
         },
     });
 
-    //inline
-    function f(sourceFile: SourceFile, start: number, errorCode: number, program: Program, cancellationToken: CancellationToken): CodeAction[] | undefined {
-        const token = getTokenAtPosition(sourceFile, start, /*includeJsDocComment*/ false);
-        if (isInJavaScriptFile(token) || !isAllowedTokenKind(token.kind)) {
-            return undefined;
-        }
-        const containingFunction = getContainingFunction(token);
-
-        const info = g(sourceFile, start, errorCode, program, cancellationToken); //name
-        if (!info) return undefined;
-
-        if (hhh(errorCode, containingFunction)) {
-            const { declaration, textChanges } = info;
-            const name = getNameOfDeclaration(declaration);
-            const description = formatStringFromArgs(getLocaleSpecificMessage(Diagnostics.Infer_parameter_types_from_usage), [name.getText()]);
-            return [{
-                description,
-                changes: [{ fileName: sourceFile.fileName, textChanges }],
-                groupId,
-            }];
-        }
-        else {
-            const { declaration, textChanges } = info;
-            const name = getNameOfDeclaration(declaration); //dup code
-            return [{
-                description: formatStringFromArgs(getLocaleSpecificMessage(Diagnostics.Infer_type_of_0_from_usage), [name.getText()]),
-                changes: [{ fileName: sourceFile.fileName, textChanges }], //dup code
-                groupId,
-            }];
-        }
-    }
-
-    function hhh(errorCode: number, containingFunction: FunctionLike): boolean { //name
+    function getDiagnostic(errorCode: number, token: Node): DiagnosticMessage {
         switch (errorCode) {
             case Diagnostics.Parameter_0_implicitly_has_an_1_type.code:
-                return !isSetAccessor(containingFunction);
+                return isSetAccessor(getContainingFunction(token)) ? Diagnostics.Infer_type_of_0_from_usage : Diagnostics.Infer_parameter_types_from_usage;
             case Diagnostics.Rest_parameter_0_implicitly_has_an_any_type.code:
-                return true;
+                return Diagnostics.Infer_parameter_types_from_usage;
             default:
-                return false;
+                return Diagnostics.Infer_type_of_0_from_usage;
         }
     }
 
-    //!
-    interface Xxx { declaration: Declaration, textChanges: TextChange[] }
+    interface Fix { declaration: Declaration, textChanges: TextChange[] }
 
-    //!
-    function g(sourceFile: SourceFile, start: number, errorCode: number, program: Program, cancellationToken: CancellationToken): Xxx | undefined {
-        const token = getTokenAtPosition(sourceFile, start, /*includeJsDocComment*/ false); //dup code
-        if (isInJavaScriptFile(token) || !isAllowedTokenKind(token.kind)) {
+    function getFix(sourceFile: SourceFile, token: Node, errorCode: number, program: Program, cancellationToken: CancellationToken): Fix | undefined {
+        if (!isAllowedTokenKind(token.kind)) {
             return undefined;
         }
 
@@ -133,15 +109,13 @@ namespace ts.codefix {
         }
     }
 
-    function getCodeActionForVariableDeclaration(declaration: VariableDeclaration | PropertyDeclaration | PropertySignature, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Xxx | undefined {
-        if (!isIdentifier(declaration.name)) {
-            return undefined;
-        }
+    function getCodeActionForVariableDeclaration(declaration: VariableDeclaration | PropertyDeclaration | PropertySignature, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Fix | undefined {
+        if (!isIdentifier(declaration.name)) return undefined;
         const type = inferTypeForVariableFromUsage(declaration.name, sourceFile, program, cancellationToken);
-        return createCodeAction(declaration, declaration.name.getEnd(), type && typeToString(type, declaration, program.getTypeChecker()));
+        return makeFix(declaration, declaration.name.getEnd(), type, program);
     }
 
-    function getCodeActionForVariableUsage(token: Identifier, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Xxx | undefined {
+    function getCodeActionForVariableUsage(token: Identifier, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Fix | undefined {
         const symbol = program.getTypeChecker().getSymbolAtLocation(token);
         return symbol && symbol.valueDeclaration && getCodeActionForVariableDeclaration(<VariableDeclaration>symbol.valueDeclaration, sourceFile, program, cancellationToken);
     }
@@ -158,28 +132,22 @@ namespace ts.codefix {
         return false;
     }
 
-    function getCodeActionForParameters(parameterDeclaration: ParameterDeclaration, containingFunction: FunctionLike, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Xxx | undefined {
+    function getCodeActionForParameters(parameterDeclaration: ParameterDeclaration, containingFunction: FunctionLike, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Fix | undefined {
         if (!isIdentifier(parameterDeclaration.name) || !isApplicableFunctionForInference(containingFunction)) {
             return undefined;
         }
 
         const types = inferTypeForParametersFromUsage(containingFunction, sourceFile, program, cancellationToken) ||
             map(containingFunction.parameters, p => isIdentifier(p.name) && inferTypeForVariableFromUsage(p.name, sourceFile, program, cancellationToken));
+        if (!types) return undefined;
 
-        const textChanges = types && zipWith(containingFunction.parameters, types, (parameter, type) => {
-            if (type && !parameter.type && !parameter.initializer) {
-                const typeString = typeToString(type, containingFunction, program.getTypeChecker());
-                return typeString ? {
-                    span: { start: parameter.end, length: 0 },
-                    newText: `: ${typeString}`
-                } : undefined;
-            }
-        }).filter(c => !!c);
+        const textChanges = mapDefinedIter(zipToIterator(containingFunction.parameters, types), ([parameter, type]) =>
+            type && !parameter.type && !parameter.initializer ? makeChange(containingFunction, parameter.end, type, program) : undefined);
 
-        return textChanges && textChanges.length && { declaration: parameterDeclaration, textChanges };
+        return textChanges.length ? { declaration: parameterDeclaration, textChanges } : undefined;
     }
 
-    function getCodeActionForSetAccessor(setAccessorDeclaration: SetAccessorDeclaration, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Xxx | undefined {
+    function getCodeActionForSetAccessor(setAccessorDeclaration: SetAccessorDeclaration, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Fix | undefined {
         const setAccessorParameter = setAccessorDeclaration.parameters[0];
         if (!setAccessorParameter || !isIdentifier(setAccessorDeclaration.name) || !isIdentifier(setAccessorParameter.name)) {
             return undefined;
@@ -187,22 +155,26 @@ namespace ts.codefix {
 
         const type = inferTypeForVariableFromUsage(setAccessorDeclaration.name, sourceFile, program, cancellationToken) ||
             inferTypeForVariableFromUsage(setAccessorParameter.name, sourceFile, program, cancellationToken);
-        return createCodeAction(setAccessorParameter, setAccessorParameter.name.getEnd(), type && typeToString(type, setAccessorDeclaration, program.getTypeChecker()));
+        return makeFix(setAccessorParameter, setAccessorParameter.name.getEnd(), type, program);
     }
 
-    function getCodeActionForGetAccessor(getAccessorDeclaration: GetAccessorDeclaration, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Xxx | undefined {
+    function getCodeActionForGetAccessor(getAccessorDeclaration: GetAccessorDeclaration, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Fix | undefined {
         if (!isIdentifier(getAccessorDeclaration.name)) {
             return undefined;
         }
 
         const type = inferTypeForVariableFromUsage(getAccessorDeclaration.name, sourceFile, program, cancellationToken);
         const closeParenToken = getFirstChildOfKind(getAccessorDeclaration, sourceFile, SyntaxKind.CloseParenToken);
-        return createCodeAction(getAccessorDeclaration, closeParenToken.getEnd(), type && typeToString(type, getAccessorDeclaration, program.getTypeChecker()));
+        return makeFix(getAccessorDeclaration, closeParenToken.getEnd(), type, program);
     }
 
-    //todo: take type, not typeString
-    function createCodeAction(declaration: Declaration, start: number, typeString: string | undefined): Xxx | undefined { //name
-        return typeString === undefined ? undefined : { declaration, textChanges: [{ span: { start, length: 0 }, newText: `: ${typeString}` }] };
+    function makeFix(declaration: Declaration, start: number, type: Type | undefined, program: Program): Fix | undefined {
+        return type && { declaration, textChanges: [makeChange(declaration, start, type, program)] };
+    }
+
+    function makeChange(declaration: Declaration, start: number, type: Type | undefined, program: Program): TextChange {
+        const typeString = type && typeToString(type, declaration, program.getTypeChecker());
+        return typeString === undefined ? undefined : { span: createTextSpan(start, 0), newText: `: ${typeString}` }
     }
 
     function getReferences(token: PropertyName | Token<SyntaxKind.ConstructorKeyword>, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Identifier[] {
@@ -224,7 +196,7 @@ namespace ts.codefix {
         return InferFromReference.inferTypeFromReferences(getReferences(token, sourceFile, program, cancellationToken), program.getTypeChecker(), cancellationToken);
     }
 
-    function inferTypeForParametersFromUsage(containingFunction: FunctionLikeDeclaration, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken) {
+    function inferTypeForParametersFromUsage(containingFunction: FunctionLikeDeclaration, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Type[] | undefined {
         switch (containingFunction.kind) {
             case SyntaxKind.Constructor:
             case SyntaxKind.FunctionExpression:
@@ -271,7 +243,7 @@ namespace ts.codefix {
         };
     }
 
-    function typeToString(type: Type, enclosingDeclaration: Declaration, checker: TypeChecker) {
+    function typeToString(type: Type, enclosingDeclaration: Declaration, checker: TypeChecker): string {
         const writer = getTypeAccessiblityWriter(checker);
         checker.getSymbolDisplayBuilder().buildTypeDisplay(type, writer, enclosingDeclaration);
         return writer.string();
