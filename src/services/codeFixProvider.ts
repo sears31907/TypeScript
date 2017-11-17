@@ -89,6 +89,7 @@ namespace ts {
     //apply in reverse order so line info isn't effected by previous changes.
     //dup?
     //kill?
+    //See dup in textChanges.ts `normalize`
     export function sortTextChanges(changes: TextChange[]): TextChange[] {//reuse
         return changes.sort((a, b) => b.span.start - a.span.start);
     }

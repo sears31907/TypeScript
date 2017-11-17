@@ -194,6 +194,7 @@ namespace ts.textChanges {
     export class ChangeTracker {
         private changes: Change[] = [];
         private readonly newLineCharacter: string;
+        private readonly deletedNodesInLists: true[] = []; //Stores ids of nodes in lists that we already deleted. Super hacky.
 
         public static fromContext(context: TextChangesContext): ChangeTracker {
             return new ChangeTracker(context.newLineCharacter === "\n" ? NewLineKind.LineFeed : NewLineKind.CarriageReturnLineFeed, context.formatContext);
@@ -220,17 +221,18 @@ namespace ts.textChanges {
         public deleteNode(sourceFile: SourceFile, node: Node, options: ConfigurableStartEnd = {}) {
             const startPosition = getAdjustedStartPosition(sourceFile, node, options, Position.FullStart);
             const endPosition = getAdjustedEndPosition(sourceFile, node, options);
-            this.changes.push({ kind: ChangeKind.Remove, sourceFile, range: { pos: startPosition, end: endPosition } });
+            this.deleteRange(sourceFile, { pos: startPosition, end: endPosition });
             return this;
         }
 
         public deleteNodeRange(sourceFile: SourceFile, startNode: Node, endNode: Node, options: ConfigurableStartEnd = {}) {
             const startPosition = getAdjustedStartPosition(sourceFile, startNode, options, Position.FullStart);
             const endPosition = getAdjustedEndPosition(sourceFile, endNode, options);
-            this.changes.push({ kind: ChangeKind.Remove, sourceFile, range: { pos: startPosition, end: endPosition } });
+            this.deleteRange(sourceFile, { pos: startPosition, end: endPosition });
             return this;
         }
 
+        //This will break if I delete two adjacent nodes in the list...
         public deleteNodeInList(sourceFile: SourceFile, node: Node) {
             const containingList = formatting.SmartIndenter.getContainingList(node, sourceFile);
             if (!containingList) {
@@ -245,6 +247,9 @@ namespace ts.textChanges {
                 this.deleteNode(sourceFile, node);
                 return this;
             }
+            const id = getNodeId(node);
+            Debug.assert(!this.deletedNodesInLists[id], "Deleting a node twice");
+            this.deletedNodesInLists[id] = true;
             if (index !== containingList.length - 1) {
                 const nextToken = getTokenAtPosition(sourceFile, node.end, /*includeJsDocComment*/ false);
                 if (nextToken && isSeparator(node, nextToken)) {
@@ -258,9 +263,18 @@ namespace ts.textChanges {
                 }
             }
             else {
-                const previousToken = getTokenAtPosition(sourceFile, containingList[index - 1].end, /*includeJsDocComment*/ false);
-                if (previousToken && isSeparator(node, previousToken)) {
-                    this.deleteNodeRange(sourceFile, previousToken, node);
+                const prev = containingList[index - 1];
+                if (this.deletedNodesInLists[getNodeId(prev)]) {
+                    const pos = skipTrivia(sourceFile.text, getAdjustedStartPosition(sourceFile, node, {}, Position.FullStart), /*stopAfterLineBreak*/ false, /*stopAtComments*/ true);
+                    const end = getAdjustedEndPosition(sourceFile, node, {});
+                    this.deleteRange(sourceFile, { pos, end });
+                }
+                else {
+                    const previousToken = getTokenAtPosition(sourceFile, containingList[index - 1].end, /*includeJsDocComment*/ false);
+                    if (previousToken && isSeparator(node, previousToken)) {
+                        this.deleteNodeRange(sourceFile, previousToken, node);
+                        //otherwise we do nothing? wierd...
+                    }
                 }
             }
             return this;

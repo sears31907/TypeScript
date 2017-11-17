@@ -13,14 +13,11 @@ namespace ts.codefix {
             return [{ description: getLocaleSpecificMessage(Diagnostics.Change_extends_to_implements), changes, groupId }];
         },
         groupIds: [groupId],
-        fixAllInGroup: context => {
-            const { sourceFile } = context;
-            return iterateErrorsForCodeActionAll(context, errorCodes, (changes, e) => {
-                const nodes = getNodes(e.file, e.start!);
-                if (!nodes) return;
-                doChanges(changes, sourceFile, nodes.extendsToken, nodes.heritageClauses);
-            });
-        }
+        //NOTE: e.file === context.sourceFile -- make this pattern neater
+        fixAllInGroup: context => iterateErrorsForCodeActionAll(context, errorCodes, (changes, e) => {
+            const nodes = getNodes(e.file, e.start!);
+            if (nodes) doChanges(changes, context.sourceFile, nodes.extendsToken, nodes.heritageClauses);
+        }),
     });
 
     function getNodes(sourceFile: SourceFile, pos: number) {
@@ -30,12 +27,12 @@ namespace ts.codefix {
         return extendsToken.kind === SyntaxKind.ExtendsKeyword ? { extendsToken, heritageClauses } : undefined;
     }
 
-    function doChanges(changeTracker: textChanges.ChangeTracker, sourceFile: SourceFile, extendsToken: Node, heritageClauses: ReadonlyArray<HeritageClause>): void {
-        changeTracker.replaceNode(sourceFile, extendsToken, createToken(SyntaxKind.ImplementsKeyword));
+    function doChanges(changes: textChanges.ChangeTracker, sourceFile: SourceFile, extendsToken: Node, heritageClauses: ReadonlyArray<HeritageClause>): void {
+        changes.replaceNode(sourceFile, extendsToken, createToken(SyntaxKind.ImplementsKeyword));
         // We replace existing keywords with commas.
         for (let i = 1; i < heritageClauses.length; i++) {
             const keywordToken = heritageClauses[i].getFirstToken()!;
-            changeTracker.replaceNode(sourceFile, keywordToken, createToken(SyntaxKind.CommaToken));
+            changes.replaceNode(sourceFile, keywordToken, createToken(SyntaxKind.CommaToken));
         }
     }
 }
