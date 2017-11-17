@@ -4,7 +4,7 @@ namespace ts.codefix {
     const errorCodes = [Diagnostics.super_must_be_called_before_accessing_this_in_the_constructor_of_a_derived_class.code];
     registerCodeFix({
         errorCodes,
-        getCodeActions: context => {
+        getCodeActions(context) {
             const { sourceFile } = context;
             const nodes = getNodes(sourceFile, context.span.start);
             if (!nodes) return undefined;
@@ -13,7 +13,7 @@ namespace ts.codefix {
             return [{ description: getLocaleSpecificMessage(Diagnostics.Make_super_call_the_first_statement_in_the_constructor), changes, groupId }];
         },
         groupIds: [groupId],
-        fixAllInGroup: context => {
+        fixAllInGroup(context) {
             const { newLineCharacter, sourceFile } = context;
             const seenClasses: true[] = []; // Ensure we only do this once per class.
             return iterateErrorsForCodeActionAll(context, errorCodes, (changes, e) => {

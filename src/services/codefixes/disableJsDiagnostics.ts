@@ -8,7 +8,29 @@ namespace ts.codefix {
 
     registerCodeFix({
         errorCodes,
-        getCodeActions: getDisableJsDiagnosticsCodeActions,
+        getCodeActions(context) {
+            const { sourceFile, program, newLineCharacter, span } = context;
+
+            if (!isInJavaScriptFile(sourceFile) || !isCheckJsEnabledForFile(sourceFile, program.getCompilerOptions())) {
+                return undefined;
+            }
+
+            return [{
+                description: getLocaleSpecificMessage(Diagnostics.Ignore_this_error_message),
+                changes: [createFileTextChanges(sourceFile.fileName, [getIgnoreCommentLocationForLocation(sourceFile, span.start, newLineCharacter)])],
+                groupId,
+            },
+            {
+                description: getLocaleSpecificMessage(Diagnostics.Disable_checking_for_this_file),
+                changes: [createFileTextChanges(sourceFile.fileName, [{
+                    span: {
+                        start: sourceFile.checkJsDirective ? sourceFile.checkJsDirective.pos : 0,
+                        length: sourceFile.checkJsDirective ? sourceFile.checkJsDirective.end - sourceFile.checkJsDirective.pos : 0
+                    },
+                    newText: `// @ts-nocheck${newLineCharacter}`
+                }])]
+            }];
+        },
         groupIds: [groupId], // No point applying as a group, doing it once will fix all errors
         fixAllInGroup,
     });
@@ -40,33 +62,9 @@ namespace ts.codefix {
         };
     }
 
-    function getDisableJsDiagnosticsCodeActions(context: CodeFixContext): CodeAction[] | undefined {
-        const { sourceFile, program, newLineCharacter, span } = context;
-
-        if (!isInJavaScriptFile(sourceFile) || !isCheckJsEnabledForFile(sourceFile, program.getCompilerOptions())) {
-            return undefined;
-        }
-
-        return [{
-            description: getLocaleSpecificMessage(Diagnostics.Ignore_this_error_message),
-            changes: [createFileTextChanges(sourceFile.fileName, [getIgnoreCommentLocationForLocation(sourceFile, span.start, newLineCharacter)])],
-            groupId,
-        },
-        {
-            description: getLocaleSpecificMessage(Diagnostics.Disable_checking_for_this_file),
-            changes: [createFileTextChanges(sourceFile.fileName, [{
-                span: {
-                    start: sourceFile.checkJsDirective ? sourceFile.checkJsDirective.pos : 0,
-                    length: sourceFile.checkJsDirective ? sourceFile.checkJsDirective.end - sourceFile.checkJsDirective.pos : 0
-                },
-                newText: `// @ts-nocheck${newLineCharacter}`
-            }])]
-        }];
-    }
-
     function fixAllInGroup(context: CodeFixAllContext): CodeActionAll {
         const { newLineCharacter, program, sourceFile } = context;
-        const changes = sortTextChanges(mapDefined(errorsIter(program, sourceFile, errorCodes), error =>
+        const changes = sortTextChanges(mapDefinedIter(errorsIterator(program, sourceFile, errorCodes), error =>
             error.start === undefined || error.length === undefined ? undefined : getIgnoreCommentLocationForLocation(sourceFile, error.start, newLineCharacter)));
         return createCodeActionAll([createFileTextChanges(sourceFile.fileName, changes)]);
     }

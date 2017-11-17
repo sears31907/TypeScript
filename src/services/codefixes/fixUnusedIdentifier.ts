@@ -4,11 +4,11 @@ namespace ts.codefix {
     const deleteGroupId = "unusedIdentifier_delete";
     const errorCodes = [
         Diagnostics._0_is_declared_but_its_value_is_never_read.code,
-        Diagnostics.Property_0_is_declared_but_its_value_is_never_read.code
+        Diagnostics.Property_0_is_declared_but_its_value_is_never_read.code,
     ];
     registerCodeFix({
         errorCodes,
-        getCodeActions: context => {
+        getCodeActions(context) {
             const { sourceFile } = context;
             const token = getToken(sourceFile, context.span.start);
             const result: CodeAction[] = [];

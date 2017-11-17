@@ -126,17 +126,23 @@ namespace ts {
         return t === undefined ? undefined : [t];
     }
 
-    //name
     export function iterateErrorsForCodeActionAll(context: CodeFixAllContext, errorCodes: number[], use: (changes: textChanges.ChangeTracker, error: Diagnostic) => void): CodeActionAll {
         return createCodeActionAll(textChanges.ChangeTracker.with(context, t => {
-            for (const error of errorsIter(context.program, context.sourceFile, errorCodes)) {
-                use(t, error); //neater
-            }
+            each(errorsIterator(context.program, context.sourceFile, errorCodes), e => use(t, e));
         }));
     }
 
+    function each<T>(iter: Iterator<T>, cb: (t: T) => void): void {
+        while (true) {
+            const { value, done } = iter.next();
+            if (done) return;
+            cb(value);
+        }
+    }
+
     //!
-    export function errorsIter(program: Program, sourceFile: SourceFile, errorCodes: number[]): Diagnostic[] { //todo: iterator
-        return program.getSemanticDiagnostics().filter(error => contains(errorCodes, error.code) && error.file === sourceFile);
+    export function errorsIterator(program: Program, sourceFile: SourceFile, errorCodes: number[]): Iterator<Diagnostic> { //todo: iterator
+        return filterIterator(arrayIterator(program.getSemanticDiagnostics()), error =>
+            contains(errorCodes, error.code) && error.file === sourceFile);
     }
 }

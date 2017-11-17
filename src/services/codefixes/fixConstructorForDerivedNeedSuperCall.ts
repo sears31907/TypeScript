@@ -4,14 +4,14 @@ namespace ts.codefix {
     const errorCodes = [Diagnostics.Constructors_for_derived_classes_must_contain_a_super_call.code];
     registerCodeFix({
         errorCodes,
-        getCodeActions: context => {
+        getCodeActions(context) {
             const { sourceFile } = context;
             const ctr = getNode(sourceFile, context.span.start);
             const changes = textChanges.ChangeTracker.with(context, t => doChange(t, sourceFile, ctr, context.newLineCharacter));
             return [{ description: getLocaleSpecificMessage(Diagnostics.Add_missing_super_call), changes, groupId }];
         },
         groupIds: [groupId],
-        fixAllInGroup: context => {
+        fixAllInGroup(context) {
             const { newLineCharacter, sourceFile } = context;
             return iterateErrorsForCodeActionAll(context, errorCodes, (changes, e) => {
                 doChange(changes, sourceFile, getNode(e.file, e.start!), newLineCharacter)

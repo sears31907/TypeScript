@@ -4,7 +4,7 @@ namespace ts.codefix {
     const errorCodes = [Diagnostics.Cannot_find_name_0_Did_you_mean_the_instance_member_this_0.code];
     registerCodeFix({
         errorCodes,
-        getCodeActions: context => {
+        getCodeActions(context) {
             const { sourceFile } = context;
             const token = getNode(sourceFile, context.span.start);
             const changes = textChanges.ChangeTracker.with(context, t => doChange(t, sourceFile, token));

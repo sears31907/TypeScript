@@ -39,8 +39,14 @@ namespace ts.codefix {
             return [{ description, changes: [{ fileName: sourceFile.fileName, textChanges }], groupId }];
         },
         groupIds: [groupId],
-        fixAllInGroup: _context => {
-            throw new Error("TODO");
+        fixAllInGroup: context => {
+            const { sourceFile, program, cancellationToken } = context;
+            const seenFunctions: true[] = [];
+            const changes = flatMapIter(errorsIterator(program, context.sourceFile, errorCodes), e => {
+                const fix = getFix(sourceFile, getTokenAtPosition(e.file, e.start!, /*includeJsDocComment*/ false), e.code, program, cancellationToken, seenFunctions);
+                return fix && fix.textChanges;
+            });
+            return createCodeActionAll([createFileTextChanges(sourceFile.fileName, changes)]);
         },
     });
 
@@ -55,9 +61,12 @@ namespace ts.codefix {
         }
     }
 
-    interface Fix { declaration: Declaration, textChanges: TextChange[] }
+    interface Fix {
+        readonly declaration: Declaration;
+        readonly textChanges: TextChange[];
+    }
 
-    function getFix(sourceFile: SourceFile, token: Node, errorCode: number, program: Program, cancellationToken: CancellationToken): Fix | undefined {
+    function getFix(sourceFile: SourceFile, token: Node, errorCode: number, program: Program, cancellationToken: CancellationToken, seenFunctions?: true[]): Fix | undefined {
         if (!isAllowedTokenKind(token.kind)) {
             return undefined;
         }
@@ -69,8 +78,15 @@ namespace ts.codefix {
             case Diagnostics.Variable_0_implicitly_has_type_1_in_some_locations_where_its_type_cannot_be_determined.code:
                 return getCodeActionForVariableDeclaration(<PropertyDeclaration | PropertySignature | VariableDeclaration>token.parent, sourceFile, program, cancellationToken);
 
-            case Diagnostics.Variable_0_implicitly_has_an_1_type.code:
-                return getCodeActionForVariableUsage(<Identifier>token, sourceFile, program, cancellationToken);
+            case Diagnostics.Variable_0_implicitly_has_an_1_type.code: {
+                if (seenFunctions) {
+                    // We should do this on the declaration.
+                    //test
+                    return undefined;
+                }
+                const symbol = program.getTypeChecker().getSymbolAtLocation(token);
+                return symbol && symbol.valueDeclaration && getCodeActionForVariableDeclaration(<VariableDeclaration>symbol.valueDeclaration, sourceFile, program, cancellationToken);
+            }
 
             // Parameter declarations
             case Diagnostics.Parameter_0_implicitly_has_an_1_type.code:
@@ -78,8 +94,16 @@ namespace ts.codefix {
                     return getCodeActionForSetAccessor(containingFunction, sourceFile, program, cancellationToken);
                 }
                 // falls through
-            case Diagnostics.Rest_parameter_0_implicitly_has_an_any_type.code:
+            case Diagnostics.Rest_parameter_0_implicitly_has_an_any_type.code: {
+                if (seenFunctions) {
+                    const id = getNodeId(containingFunction);
+                    if (seenFunctions[id]) {
+                        return undefined;
+                    }
+                    seenFunctions[id] = true;
+                }
                 return getCodeActionForParameters(<ParameterDeclaration>token.parent, containingFunction, sourceFile, program, cancellationToken);
+            }
 
             // Get Accessor declarations
             case Diagnostics.Property_0_implicitly_has_type_any_because_its_get_accessor_lacks_a_return_type_annotation.code:
@@ -113,11 +137,6 @@ namespace ts.codefix {
         if (!isIdentifier(declaration.name)) return undefined;
         const type = inferTypeForVariableFromUsage(declaration.name, sourceFile, program, cancellationToken);
         return makeFix(declaration, declaration.name.getEnd(), type, program);
-    }
-
-    function getCodeActionForVariableUsage(token: Identifier, sourceFile: SourceFile, program: Program, cancellationToken: CancellationToken): Fix | undefined {
-        const symbol = program.getTypeChecker().getSymbolAtLocation(token);
-        return symbol && symbol.valueDeclaration && getCodeActionForVariableDeclaration(<VariableDeclaration>symbol.valueDeclaration, sourceFile, program, cancellationToken);
     }
 
     function isApplicableFunctionForInference(declaration: FunctionLike): declaration is MethodDeclaration | FunctionDeclaration | ConstructorDeclaration {

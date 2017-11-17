@@ -7,7 +7,7 @@ namespace ts.codefix {
     ];
     registerCodeFix({
         errorCodes,
-        getCodeActions: context => {
+        getCodeActions(context) {
             const { sourceFile } = context;
             const info = getInfo(sourceFile, context.span.start,  context.program.getTypeChecker());
             if (!info) return undefined;
