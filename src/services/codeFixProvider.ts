@@ -132,7 +132,8 @@ namespace ts {
         }));
     }
 
-    function each<T>(iter: Iterator<T>, cb: (t: T) => void): void {
+    //!
+    export function each<T>(iter: Iterator<T>, cb: (t: T) => void): void {
         while (true) {
             const { value, done } = iter.next();
             if (done) return;

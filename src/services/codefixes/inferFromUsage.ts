@@ -24,7 +24,7 @@ namespace ts.codefix {
     ];
     registerCodeFix({
         errorCodes,
-        getCodeActions: ({ sourceFile, program, span: { start }, errorCode, cancellationToken }) => {
+        getCodeActions({ sourceFile, program, span: { start }, errorCode, cancellationToken }) {
             if (isSourceFileJavaScript(sourceFile)) {
                 return undefined; // TODO: GH#20113
             }
@@ -39,7 +39,7 @@ namespace ts.codefix {
             return [{ description, changes: [{ fileName: sourceFile.fileName, textChanges }], groupId }];
         },
         groupIds: [groupId],
-        fixAllInGroup: context => {
+        fixAllInGroup(context) {
             const { sourceFile, program, cancellationToken } = context;
             const seenFunctions: true[] = [];
             const changes = flatMapIter(errorsIterator(program, context.sourceFile, errorCodes), e => {
