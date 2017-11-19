@@ -1,6 +1,7 @@
 /* @internal */
 namespace ts.codefix {
 
+    //kill! use textchanges
     export function newNodesToChanges(newNodes: Node[], insertAfter: Node, context: CodeFixContext) {
         const sourceFile = context.sourceFile;
 
@@ -168,7 +169,7 @@ namespace ts.codefix {
         return newMethod;
     }
 
-    function createDummyParameters(argCount: number,  names: string[] | undefined, minArgumentCount: number | undefined, addAnyType: boolean) {
+    function createDummyParameters(argCount: number,  names: string[] | undefined, minArgumentCount: number | undefined, addAnyType: boolean): ParameterDeclaration[] {
         const parameters: ParameterDeclaration[] = [];
         for (let i = 0; i < argCount; i++) {
             const newParameter = createParameter(
@@ -229,7 +230,7 @@ namespace ts.codefix {
             /*returnType*/ undefined);
     }
 
-    export function createStubbedMethod(
+    function createStubbedMethod(
         modifiers: ReadonlyArray<Modifier>,
         name: PropertyName,
         optional: boolean,
@@ -258,7 +259,7 @@ namespace ts.codefix {
             /*multiline*/ true);
     }
 
-    function createVisibilityModifier(flags: ModifierFlags) {
+    function createVisibilityModifier(flags: ModifierFlags): Modifier | undefined {
         if (flags & ModifierFlags.Public) {
             return createToken(SyntaxKind.PublicKeyword);
         }

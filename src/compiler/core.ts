@@ -1049,6 +1049,11 @@ namespace ts {
             : undefined;
     }
 
+    export function single<T>(array: ReadonlyArray<T>): T {
+        Debug.assert(array.length === 1);
+        return array[0];
+    }
+
     /**
      * Returns the only element of an array if it contains only one element; otheriwse, returns the
      * array.

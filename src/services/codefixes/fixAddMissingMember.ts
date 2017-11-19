@@ -1,6 +1,6 @@
 /* @internal */
 namespace ts.codefix {
-    //todo: group
+    //todo: group? but that would affect other files...
     registerCodeFix({
         errorCodes: [Diagnostics.Property_0_does_not_exist_on_type_1.code,
                      Diagnostics.Property_0_does_not_exist_on_type_1_Did_you_mean_2.code],
@@ -15,7 +15,7 @@ namespace ts.codefix {
         //      ^^^^^^^
         const token = getTokenAtPosition(tokenSourceFile, start, /*includeJsDocComment*/ false);
 
-        if (token.kind !== SyntaxKind.Identifier) {
+        if (!isIdentifier(token)) {
             return undefined;
         }
 
@@ -23,60 +23,47 @@ namespace ts.codefix {
             return undefined;
         }
 
-        const tokenName = token.getText(tokenSourceFile);
+        const info = getInfo(token, token.parent, context.program.getTypeChecker());
+        if (!info) return undefined;
+        const { classDeclaration, makeStatic } = info;
 
-        let makeStatic = false;
-        let classDeclaration: ClassLikeDeclaration;
+        const classDeclarationSourceFile = classDeclaration.getSourceFile();
+        const classOpenBrace = getOpenBraceOfClassLike(classDeclaration, classDeclarationSourceFile);
 
-        if (token.parent.expression.kind === SyntaxKind.ThisKeyword) {
+        const inJs = isInJavaScriptFile(classDeclarationSourceFile);
+        const methodCodeAction = getActionForMethodDeclaration(context, classDeclarationSourceFile, classOpenBrace, token, makeStatic, /*includeTypeScriptSyntax*/ !inJs);
+        const x = inJs ? //name
+            getActionsForAddMissingMemberInJavaScriptFile(context, classDeclarationSourceFile, token.text, classDeclaration, makeStatic) :
+            getActionsForAddMissingMemberInTypeScriptFile(context, classDeclarationSourceFile, classOpenBrace, token, token.text, classDeclaration, makeStatic);
+        return concatenate(makeSingle(methodCodeAction), x);
+    }
+
+    //!
+    function getInfo(token: Identifier, parent: PropertyAccessExpression, checker: TypeChecker): { readonly classDeclaration: ClassLikeDeclaration, makeStatic: boolean } {
+        if (parent.expression.kind === SyntaxKind.ThisKeyword) {
             const containingClassMemberDeclaration = getThisContainer(token, /*includeArrowFunctions*/ false);
             if (!isClassElement(containingClassMemberDeclaration)) {
                 return undefined;
             }
-
-            classDeclaration = <ClassLikeDeclaration>containingClassMemberDeclaration.parent;
-
+            const classDeclaration = containingClassMemberDeclaration.parent;
             // Property accesses on `this` in a static method are accesses of a static member.
-            makeStatic = classDeclaration && hasModifier(containingClassMemberDeclaration, ModifierFlags.Static);
+            return isClassLike(classDeclaration) ? { classDeclaration, makeStatic: hasModifier(containingClassMemberDeclaration, ModifierFlags.Static) } : undefined;
         }
         else {
-
-            const checker = context.program.getTypeChecker();
-            const leftExpression = token.parent.expression;
+            const leftExpression = parent.expression;
             const leftExpressionType = checker.getTypeAtLocation(leftExpression);
-
-            if (leftExpressionType.flags & TypeFlags.Object) {
-                const symbol = leftExpressionType.symbol;
-                if (symbol.flags & SymbolFlags.Class) {
-                    classDeclaration = symbol.declarations && <ClassLikeDeclaration>symbol.declarations[0];
-                    if (leftExpressionType !== checker.getDeclaredTypeOfSymbol(symbol)) {
-                        // The expression is a class symbol but the type is not the instance-side.
-                        makeStatic = true;
-                    }
-                }
-            }
+            const symbol = leftExpressionType.symbol;
+            if (!(leftExpressionType.flags & TypeFlags.Object && symbol.flags & SymbolFlags.Class)) return undefined;
+            const classDeclaration = symbol.declarations && <ClassLikeDeclaration>symbol.declarations[0]; //! what if an interface comes first?
+            // The expression is a class symbol but the type is not the instance-side.
+            return { classDeclaration, makeStatic: leftExpressionType !== checker.getDeclaredTypeOfSymbol(symbol) };
         }
-
-        if (!classDeclaration || !isClassLike(classDeclaration)) {
-            return undefined;
-        }
-
-        const classDeclarationSourceFile = getSourceFileOfNode(classDeclaration);
-        const classOpenBrace = getOpenBraceOfClassLike(classDeclaration, classDeclarationSourceFile);
-
-        const inJs = isInJavaScriptFile(classDeclarationSourceFile);
-        const methodCodeAction = getActionForMethodDeclaration(context, classDeclarationSourceFile, classOpenBrace, token, tokenName, makeStatic, /*includeTypeScriptSyntax*/ !inJs);
-        return inJs ?
-            getActionsForAddMissingMemberInJavaScriptFile(methodCodeAction, context, classDeclarationSourceFile, tokenName, classDeclaration, makeStatic) :
-            getActionsForAddMissingMemberInTypeScriptFile(methodCodeAction, context, classDeclarationSourceFile, classOpenBrace, token, tokenName, classDeclaration, makeStatic);
     }
 
-    function getActionsForAddMissingMemberInJavaScriptFile(methodCodeAction: CodeAction | undefined, context: CodeFixContext, classDeclarationSourceFile: SourceFile, tokenName: string,classDeclaration: ClassLikeDeclaration, makeStatic: boolean): CodeAction[] | undefined {
-        let actions = makeSingle(methodCodeAction);
-
+    function getActionsForAddMissingMemberInJavaScriptFile(context: CodeFixContext, classDeclarationSourceFile: SourceFile, tokenName: string,classDeclaration: ClassLikeDeclaration, makeStatic: boolean): CodeAction[] | undefined {
         if (makeStatic) {
             if (classDeclaration.kind === SyntaxKind.ClassExpression) {
-                return actions;
+                return undefined;
             }
 
             const className = classDeclaration.name.getText();
@@ -91,18 +78,15 @@ namespace ts.codefix {
                 classDeclaration,
                 staticInitialization,
                 { prefix: context.newLineCharacter, suffix: context.newLineCharacter });
-            const initializeStaticAction = {
+            return [{
                 description: formatStringFromArgs(getLocaleSpecificMessage(Diagnostics.Initialize_static_property_0), [tokenName]),
                 changes: staticInitializationChangeTracker.getChanges()
-            };
-
-            (actions || (actions = [])).push(initializeStaticAction);
-            return actions;
+            }];
         }
         else {
             const classConstructor = getFirstConstructorWithBody(classDeclaration);
             if (!classConstructor) {
-                return actions;
+                return undefined;
             }
 
             const propertyInitialization = createStatement(createAssignment(
@@ -116,18 +100,15 @@ namespace ts.codefix {
                 propertyInitialization,
                 { suffix: context.newLineCharacter });
 
-            const initializeAction = {
+            return [{
                 description: formatStringFromArgs(getLocaleSpecificMessage(Diagnostics.Initialize_property_0_in_the_constructor), [tokenName]),
                 changes: propertyInitializationChangeTracker.getChanges()
-            };
-
-            (actions || (actions = [])).push(initializeAction);
-            return actions;
+            }];
         }
     }
 
-    function getActionsForAddMissingMemberInTypeScriptFile(methodCodeAction: CodeAction | undefined, context: CodeFixContext, classDeclarationSourceFile: SourceFile, classOpenBrace: Node, token: Node, tokenName: string, classDeclaration: ClassLikeDeclaration, makeStatic: boolean): CodeAction[] | undefined {
-        let actions = makeSingle(methodCodeAction);
+    function getActionsForAddMissingMemberInTypeScriptFile(context: CodeFixContext, classDeclarationSourceFile: SourceFile, classOpenBrace: Node, token: Node, tokenName: string, classDeclaration: ClassLikeDeclaration, makeStatic: boolean): CodeAction[] | undefined {
+        const actions = [];
 
         let typeNode: TypeNode;
         if (token.parent.parent.kind === SyntaxKind.BinaryExpression) {
@@ -150,7 +131,7 @@ namespace ts.codefix {
         propertyChangeTracker.insertNodeAfter(classDeclarationSourceFile, classOpenBrace, property, { suffix: context.newLineCharacter });
 
         const diag = makeStatic ? Diagnostics.Declare_static_property_0 : Diagnostics.Declare_property_0;
-        actions = append(actions, {
+        actions.push({
             description: formatStringFromArgs(getLocaleSpecificMessage(diag), [tokenName]),
             changes: propertyChangeTracker.getChanges()
         });
@@ -184,16 +165,16 @@ namespace ts.codefix {
         return actions;
     }
 
-    function getActionForMethodDeclaration(context: CodeFixContext, classDeclarationSourceFile: SourceFile, classOpenBrace: Node, token: Node, tokenName: string, makeStatic: boolean, includeTypeScriptSyntax: boolean): CodeAction | undefined {
+    function getActionForMethodDeclaration(context: CodeFixContext, classDeclarationSourceFile: SourceFile, classOpenBrace: Node, token: Identifier, makeStatic: boolean, includeTypeScriptSyntax: boolean): CodeAction | undefined {
         if (token.parent.parent.kind !== SyntaxKind.CallExpression) {
             return undefined;
         }
 
         const callExpression = <CallExpression>token.parent.parent;
-        const methodDeclaration = createMethodFromCallExpression(callExpression, tokenName, includeTypeScriptSyntax, makeStatic);
+        const methodDeclaration = createMethodFromCallExpression(callExpression, token.text, includeTypeScriptSyntax, makeStatic);
 
         const changes = textChanges.ChangeTracker.with(context, t => t.insertNodeAfter(classDeclarationSourceFile, classOpenBrace, methodDeclaration, { suffix: context.newLineCharacter }));
         const diag = makeStatic ? Diagnostics.Declare_static_method_0 : Diagnostics.Declare_method_0;
-        return { description: formatStringFromArgs(getLocaleSpecificMessage(diag), [tokenName]), changes };
+        return { description: formatStringFromArgs(getLocaleSpecificMessage(diag), [token.text]), changes };
     }
 }
