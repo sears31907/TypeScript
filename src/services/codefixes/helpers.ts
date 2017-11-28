@@ -1,12 +1,5 @@
 /* @internal */
 namespace ts.codefix {
-    //kill! use textchanges.ChangeTracker from outside
-    export function newNodesToChanges(sourceFile: SourceFile, newNodes: Node[], insertAfter: Node, changeTracker: textChanges.ChangeTracker, newLineCharacter: string) {
-        for (const newNode of newNodes) {
-            changeTracker.insertNodeAfter(sourceFile, insertAfter, newNode, { suffix: newLineCharacter });
-        }
-    }
-
     /**
      * Finds members of the resolved type that are missing in the class pointed to by class decl
      * and generates source code for the missing members.
@@ -14,29 +7,19 @@ namespace ts.codefix {
      * @returns Empty string iff there are no member insertions.
      */
     //use changetracker!
-    export function createMissingMemberNodes(classDeclaration: ClassLikeDeclaration, possiblyMissingSymbols: Symbol[], checker: TypeChecker): Node[] {
+    export function createMissingMemberNodes(classDeclaration: ClassLikeDeclaration, possiblyMissingSymbols: ReadonlyArray<Symbol>, checker: TypeChecker, out: (node: Node) => void): void {
         const classMembers = classDeclaration.symbol.members;
-        const missingMembers = possiblyMissingSymbols.filter(symbol => !classMembers.has(symbol.escapedName));
-
-        let newNodes: Node[] = [];
-        for (const symbol of missingMembers) {
-            const newNode = createNewNodeForMemberSymbol(symbol, classDeclaration, checker);
-            if (newNode) {
-                if (Array.isArray(newNode)) {
-                    newNodes = newNodes.concat(newNode);
-                }
-                else {
-                    newNodes.push(newNode);
-                }
+        for (const symbol of possiblyMissingSymbols) {
+            if (!classMembers.has(symbol.escapedName)) {
+                addNewNodeForMemberSymbol(symbol, classDeclaration, checker, out);
             }
         }
-        return newNodes;
     }
 
     /**
      * @returns Empty string iff there we can't figure out a representation for `symbol` in `enclosingDeclaration`.
      */
-    function createNewNodeForMemberSymbol(symbol: Symbol, enclosingDeclaration: ClassLikeDeclaration, checker: TypeChecker): Node[] | Node | undefined {
+    function addNewNodeForMemberSymbol(symbol: Symbol, enclosingDeclaration: ClassLikeDeclaration, checker: TypeChecker, out: (node: Node) => void): void {
         const declarations = symbol.getDeclarations();
         if (!(declarations && declarations.length)) {
             return undefined;
@@ -56,14 +39,14 @@ namespace ts.codefix {
             case SyntaxKind.PropertySignature:
             case SyntaxKind.PropertyDeclaration:
                 const typeNode = checker.typeToTypeNode(type, enclosingDeclaration);
-                const property = createProperty(
+                out(createProperty(
                     /*decorators*/undefined,
                     modifiers,
                     name,
                     optional ? createToken(SyntaxKind.QuestionToken) : undefined,
                     typeNode,
-                    /*initializer*/ undefined);
-                return property;
+                    /*initializer*/ undefined));
+                break;
             case SyntaxKind.MethodSignature:
             case SyntaxKind.MethodDeclaration:
                 // The signature for the implementation appears as an entry in `signatures` iff
@@ -75,50 +58,43 @@ namespace ts.codefix {
                 // correspondence of declarations and signatures.
                 const signatures = checker.getSignaturesOfType(type, SignatureKind.Call);
                 if (!some(signatures)) {
-                    return undefined;
+                    break;
                 }
 
                 if (declarations.length === 1) {
                     Debug.assert(signatures.length === 1);
                     const signature = signatures[0];
-                    return signatureToMethodDeclaration(signature, enclosingDeclaration, createStubbedMethodBody());
+                    signatureToMethodDeclaration(signature, enclosingDeclaration, createStubbedMethodBody());
+                    break;
                 }
 
-                const signatureDeclarations: MethodDeclaration[] = [];
                 for (const signature of signatures) {
-                    const methodDeclaration = signatureToMethodDeclaration(signature, enclosingDeclaration);
-                    if (methodDeclaration) {
-                        signatureDeclarations.push(methodDeclaration);
-                    }
+                    signatureToMethodDeclaration(signature, enclosingDeclaration);
                 }
 
                 if (declarations.length > signatures.length) {
                     const signature = checker.getSignatureFromDeclaration(declarations[declarations.length - 1] as SignatureDeclaration);
-                    const methodDeclaration = signatureToMethodDeclaration(signature, enclosingDeclaration, createStubbedMethodBody());
-                    if (methodDeclaration) {
-                        signatureDeclarations.push(methodDeclaration);
-                    }
+                    signatureToMethodDeclaration(signature, enclosingDeclaration, createStubbedMethodBody());
                 }
                 else {
                     Debug.assert(declarations.length === signatures.length);
-                    const methodImplementingSignatures = createMethodImplementingSignatures(signatures, name, optional, modifiers);
-                    signatureDeclarations.push(methodImplementingSignatures);
+                    out(createMethodImplementingSignatures(signatures, name, optional, modifiers));
                 }
-                return signatureDeclarations;
-            default:
-                return undefined;
+                break;
         }
 
         function signatureToMethodDeclaration(signature: Signature, enclosingDeclaration: Node, body?: Block) {
             const signatureDeclaration = <MethodDeclaration>checker.signatureToSignatureDeclaration(signature, SyntaxKind.MethodDeclaration, enclosingDeclaration, NodeBuilderFlags.SuppressAnyReturnType);
-            if (signatureDeclaration) {
-                signatureDeclaration.decorators = undefined;
-                signatureDeclaration.modifiers = modifiers;
-                signatureDeclaration.name = name;
-                signatureDeclaration.questionToken = optional ? createToken(SyntaxKind.QuestionToken) : undefined;
-                signatureDeclaration.body = body;
+            if (!signatureDeclaration) {
+                return;
             }
-            return signatureDeclaration;
+
+            signatureDeclaration.decorators = undefined;
+            signatureDeclaration.modifiers = modifiers;
+            signatureDeclaration.name = name;
+            signatureDeclaration.questionToken = optional ? createToken(SyntaxKind.QuestionToken) : undefined;
+            signatureDeclaration.body = body;
+            out(signatureDeclaration);
         }
     }
 

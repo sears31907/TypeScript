@@ -26,16 +26,22 @@ namespace ts.codefix {
 
         // Note that this is ultimately derived from a map indexed by symbol names,
         // so duplicates cannot occur.
-        const extendsSymbols = checker.getPropertiesOfType(instantiatedExtendsType);
-        const abstractAndNonPrivateExtendsSymbols = extendsSymbols.filter(symbolPointsToNonPrivateAndAbstractMember);
+        const abstractAndNonPrivateExtendsSymbols = checker.getPropertiesOfType(instantiatedExtendsType).filter(symbolPointsToNonPrivateAndAbstractMember);
 
-        const newNodes = createMissingMemberNodes(classDeclaration, abstractAndNonPrivateExtendsSymbols, checker);
-        if (newNodes.length === 0) {
-            return undefined;
+        const changes = textChanges.ChangeTracker.with(context, t => foo(classDeclaration, abstractAndNonPrivateExtendsSymbols, sourceFile, checker, context.newLineCharacter, t));
+        return changes.length === 0 ? undefined : [{ description: getLocaleSpecificMessage(Diagnostics.Implement_inherited_abstract_class), changes }];
+    }
+
+    function foo(classDeclaration: ClassLikeDeclaration,  abstractAndNonPrivateExtendsSymbols: ReadonlyArray<Symbol>, sourceFile: SourceFile, checker: TypeChecker, newLineCharacter: string, changeTracker: textChanges.ChangeTracker) {
+        createMissingMemberNodes(classDeclaration, abstractAndNonPrivateExtendsSymbols, checker, createInsert(changeTracker, sourceFile, classDeclaration, newLineCharacter));
+    }
+
+    //!
+    export function createInsert(changeTracker: textChanges.ChangeTracker, sourceFile: SourceFile, classDeclaration: ClassLikeDeclaration, newLineCharacter: string): (newNode: Node) => void {
+        return newNode => {
+            Debug.assert(!!newNode);
+            changeTracker.insertNodeAfter(sourceFile, getOpenBraceOfClassLike(classDeclaration, sourceFile), newNode, { suffix: newLineCharacter })
         }
-
-        const changes = textChanges.ChangeTracker.with(context, t => newNodesToChanges(sourceFile, newNodes, getOpenBraceOfClassLike(classDeclaration, sourceFile), t, context.newLineCharacter));
-        return [{ description: getLocaleSpecificMessage(Diagnostics.Implement_inherited_abstract_class), changes }];
     }
 
     function symbolPointsToNonPrivateAndAbstractMember(symbol: Symbol): boolean {
