@@ -24,7 +24,6 @@ namespace ts.codefix {
         const hasNumericIndexSignature = !!checker.getIndexTypeOfType(classType, IndexKind.Number);
         const hasStringIndexSignature = !!checker.getIndexTypeOfType(classType, IndexKind.String);
 
-        const result: CodeAction[] = [];
         for (const implementedTypeNode of implementedTypeNodes) {
             // Note that this is ultimately derived from a map indexed by symbol names,
             // so duplicates cannot occur.
@@ -35,14 +34,14 @@ namespace ts.codefix {
             let newNodes: Node[] = [];
             createAndAddMissingIndexSignatureDeclaration(implementedType, IndexKind.Number, hasNumericIndexSignature, newNodes);
             createAndAddMissingIndexSignatureDeclaration(implementedType, IndexKind.String, hasStringIndexSignature, newNodes);
-            newNodes = newNodes.concat(createMissingMemberNodes(classDeclaration, nonPrivateMembers, checker));
-            const message = formatStringFromArgs(getLocaleSpecificMessage(Diagnostics.Implement_interface_0), [implementedTypeNode.getText()]);
+            addRange(newNodes, createMissingMemberNodes(classDeclaration, nonPrivateMembers, checker)));
             if (newNodes.length > 0) {
-                pushAction(result, newNodes, message);
+                const description = formatStringFromArgs(getLocaleSpecificMessage(Diagnostics.Implement_interface_0), [implementedTypeNode.getText()]);
+                return [{ description, changes: newNodesToChanges(newNodes, openBrace, context) }];
             }
         }
 
-        return result;
+        return [];
 
         function createAndAddMissingIndexSignatureDeclaration(type: InterfaceType, kind: IndexKind, hasIndexSigOfKind: boolean, newNodes: Node[]): void {
             if (hasIndexSigOfKind) {
@@ -56,10 +55,6 @@ namespace ts.codefix {
             }
             const newIndexSignatureDeclaration = checker.indexInfoToIndexSignatureDeclaration(indexInfoOfKind, kind, classDeclaration);
             newNodes.push(newIndexSignatureDeclaration);
-        }
-
-        function pushAction(result: CodeAction[], newNodes: Node[], description: string): void {
-            result.push({ description, changes: newNodesToChanges(newNodes, openBrace, context) });
         }
     }
 }
