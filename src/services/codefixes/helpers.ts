@@ -1,31 +1,10 @@
 /* @internal */
 namespace ts.codefix {
-
-    //kill! use textchanges
-    export function newNodesToChanges(newNodes: Node[], insertAfter: Node, context: CodeFixContext) {
-        const sourceFile = context.sourceFile;
-
-        const changeTracker = textChanges.ChangeTracker.fromContext(context);
-
+    //kill! use textchanges.ChangeTracker from outside
+    export function newNodesToChanges(sourceFile: SourceFile, newNodes: Node[], insertAfter: Node, changeTracker: textChanges.ChangeTracker, newLineCharacter: string) {
         for (const newNode of newNodes) {
-            changeTracker.insertNodeAfter(sourceFile, insertAfter, newNode, { suffix: context.newLineCharacter });
+            changeTracker.insertNodeAfter(sourceFile, insertAfter, newNode, { suffix: newLineCharacter });
         }
-
-        const changes = changeTracker.getChanges();
-        if (!some(changes)) {
-            return changes;
-        }
-
-        Debug.assert(changes.length === 1);
-        const consolidatedChanges: FileTextChanges[] = [{
-            fileName: changes[0].fileName,
-            textChanges: [{
-                span: changes[0].textChanges[0].span,
-                newText: changes[0].textChanges.reduce((prev, cur) => prev + cur.newText, "")
-            }]
-
-        }];
-        return consolidatedChanges;
     }
 
     /**
@@ -34,6 +13,7 @@ namespace ts.codefix {
      * @param possiblyMissingSymbols The collection of symbols to filter and then get insertions for.
      * @returns Empty string iff there are no member insertions.
      */
+    //use changetracker!
     export function createMissingMemberNodes(classDeclaration: ClassLikeDeclaration, possiblyMissingSymbols: Symbol[], checker: TypeChecker): Node[] {
         const classMembers = classDeclaration.symbol.members;
         const missingMembers = possiblyMissingSymbols.filter(symbol => !classMembers.has(symbol.escapedName));

@@ -30,13 +30,12 @@ namespace ts.codefix {
         const abstractAndNonPrivateExtendsSymbols = extendsSymbols.filter(symbolPointsToNonPrivateAndAbstractMember);
 
         const newNodes = createMissingMemberNodes(classDeclaration, abstractAndNonPrivateExtendsSymbols, checker);
-        const changes = newNodesToChanges(newNodes, getOpenBraceOfClassLike(classDeclaration, sourceFile), context);
-        if (changes && changes.length > 0) {
-            return [{
-                description: getLocaleSpecificMessage(Diagnostics.Implement_inherited_abstract_class),
-                changes
-            }];
+        if (newNodes.length === 0) {
+            return undefined;
         }
+
+        const changes = textChanges.ChangeTracker.with(context, t => newNodesToChanges(sourceFile, newNodes, getOpenBraceOfClassLike(classDeclaration, sourceFile), t, context.newLineCharacter));
+        return [{ description: getLocaleSpecificMessage(Diagnostics.Implement_inherited_abstract_class), changes }];
     }
 
     function symbolPointsToNonPrivateAndAbstractMember(symbol: Symbol): boolean {
