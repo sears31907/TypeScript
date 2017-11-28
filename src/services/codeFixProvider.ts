@@ -118,7 +118,7 @@ namespace ts {
                 allCommands = addRange(allCommands, commands);
             }
         }
-        return { changes: mapIter(allChanges.entries(), ([fileName, changes]) => ({ fileName, textChanges: sortTextChanges(changes) })), commands: allCommands };
+        return { changes: arrayFrom(mapIterator(allChanges.entries(), ([fileName, changes]) => ({ fileName, textChanges: sortTextChanges(changes) }))), commands: allCommands };
     }
 
     //!

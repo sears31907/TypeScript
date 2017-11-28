@@ -23,8 +23,8 @@ goTo.marker();
 verify.codeFixAll({
     groupId: "fixCannotFindModule",
     commands: [
-        { packageName: "@types/abs", type: "install package" },
-        { packageName: "@types/zap", type: "install package" },
+        { packageName: "@types/abs", file: "/a.ts", type: "install package" },
+        { packageName: "@types/zap", file: "/a.ts", type: "install package" },
     ],
     newFileContent: `import * as abs from "abs";
 import * as zap from "zap";` // unchanged
