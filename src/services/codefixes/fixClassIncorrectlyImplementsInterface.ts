@@ -4,7 +4,7 @@ namespace ts.codefix {
     const groupId = "fixClassIncorrectlyImplementsInterface"; //todo: share a group with fixClassDoesntImplementInheritedAbstractMember?
     registerCodeFix({
         errorCodes,
-        getCodeActions: context => {
+        getCodeActions(context) {
             const { newLineCharacter, program, sourceFile, span } = context;
             const classDeclaration = getClass(sourceFile, span.start);
             const checker = program.getTypeChecker();
@@ -16,7 +16,7 @@ namespace ts.codefix {
             });
         },
         groupIds: [groupId],
-        fixAllInGroup: context => {
+        fixAllInGroup(context) {
             const seenClassDeclarations: true[] = [];
             return iterateErrorsForCodeActionAll(context, errorCodes, (changes, err) => {
                 const classDeclaration = getClass(err.file!, err.start!);

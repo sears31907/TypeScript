@@ -1,6 +1,6 @@
 /* @internal */
 namespace ts.codefix {
-    //todo: group
+    // TODO: GH#20315
     import ChangeTracker = textChanges.ChangeTracker;
 
     registerCodeFix({
