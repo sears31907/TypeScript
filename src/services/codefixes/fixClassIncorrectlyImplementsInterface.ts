@@ -1,29 +1,48 @@
 /* @internal */
 namespace ts.codefix {
-    //todo: group
+    const errorCodes = [Diagnostics.Class_0_incorrectly_implements_interface_1.code];
+    const groupId = "fixClassIncorrectlyImplementsInterface"; //todo: share a group with fixClassDoesntImplementInheritedAbstractMember?
     registerCodeFix({
-        errorCodes: [Diagnostics.Class_0_incorrectly_implements_interface_1.code],
-        getCodeActions: getActionForClassLikeIncorrectImplementsInterface
+        errorCodes,
+        getCodeActions: context => {
+            const { newLineCharacter, program, sourceFile, span } = context;
+            const classDeclaration = getClass(sourceFile, span.start);
+            const checker = program.getTypeChecker();
+            return mapDefined<ExpressionWithTypeArguments, CodeAction>(getClassImplementsHeritageClauseElements(classDeclaration), implementedTypeNode => {
+                const changes = textChanges.ChangeTracker.with(context, t => addMissingDeclarations(checker, implementedTypeNode, sourceFile, classDeclaration, newLineCharacter, t));
+                if (changes.length === 0) return undefined;
+                const description = formatStringFromArgs(getLocaleSpecificMessage(Diagnostics.Implement_interface_0), [implementedTypeNode.getText()]);
+                return { description, changes, groupId };
+            });
+        },
+        groupIds: [groupId],
+        fixAllInGroup: context => {
+            const seenClassDeclarations: true[] = [];
+            return iterateErrorsForCodeActionAll(context, errorCodes, (changes, err) => {
+                const classDeclaration = getClass(err.file!, err.start!);
+                if (addToSeen(seenClassDeclarations, getNodeId(classDeclaration))) {
+                    for (const implementedTypeNode of getClassImplementsHeritageClauseElements(classDeclaration)) {
+                        addMissingDeclarations(context.program.getTypeChecker(), implementedTypeNode, err.file!, classDeclaration, context.newLineCharacter, changes);
+                    }
+                }
+            });
+        },
     });
 
-    function getActionForClassLikeIncorrectImplementsInterface(context: CodeFixContext): CodeAction[] | undefined {
-        const sourceFile = context.sourceFile;
-        const start = context.span.start;
-        const token = getTokenAtPosition(sourceFile, start, /*includeJsDocComment*/ false);
-        const checker = context.program.getTypeChecker();
-
-        const classDeclaration = getContainingClass(token);
+    function getClass(sourceFile: SourceFile, pos: number): ClassLikeDeclaration {
+        const classDeclaration = getContainingClass(getTokenAtPosition(sourceFile, pos, /*includeJsDocComment*/ false));
         Debug.assert(!!classDeclaration);
-
-        return mapDefined<ExpressionWithTypeArguments, CodeAction>(getClassImplementsHeritageClauseElements(classDeclaration), implementedTypeNode => {
-            const changes = textChanges.ChangeTracker.with(context, t => foo(checker, implementedTypeNode, sourceFile, classDeclaration, context.newLineCharacter, t));
-            if (changes.length === 0) return undefined;
-            const description = formatStringFromArgs(getLocaleSpecificMessage(Diagnostics.Implement_interface_0), [implementedTypeNode.getText()]);
-            return { description, changes };
-        });
+        return classDeclaration!;
     }
 
-    function foo(checker: TypeChecker, implementedTypeNode: ExpressionWithTypeArguments, sourceFile: SourceFile, classDeclaration: ClassLikeDeclaration, newLineCharacter: string, changeTracker: textChanges.ChangeTracker): void {
+    function addMissingDeclarations(
+        checker: TypeChecker,
+        implementedTypeNode: ExpressionWithTypeArguments,
+        sourceFile: SourceFile,
+        classDeclaration: ClassLikeDeclaration,
+        newLineCharacter: string,
+        changeTracker: textChanges.ChangeTracker
+    ): void {
         // Note that this is ultimately derived from a map indexed by symbol names,
         // so duplicates cannot occur.
         const implementedType = checker.getTypeAtLocation(implementedTypeNode) as InterfaceType;
@@ -35,7 +54,7 @@ namespace ts.codefix {
         const hasNumericIndexSignature = !!checker.getIndexTypeOfType(classType, IndexKind.Number); //inline
         const hasStringIndexSignature = !!checker.getIndexTypeOfType(classType, IndexKind.String); //inline
 
-        const insert = createInsert(changeTracker, sourceFile, classDeclaration, newLineCharacter);
+        const insert = addNewMemberToClass(changeTracker, sourceFile, classDeclaration, newLineCharacter);
 
         if (!hasNumericIndexSignature) createMissingIndexSignatureDeclaration(implementedType, IndexKind.Number);
         if (!hasStringIndexSignature) createMissingIndexSignatureDeclaration(implementedType, IndexKind.String);

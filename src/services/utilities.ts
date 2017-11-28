@@ -1099,6 +1099,15 @@ namespace ts {
             return !seen[id] && (seen[id] = true);
         };
     }
+
+    /** Add a value to a set, and return true if it wasn't already present. */
+    export function addToSeen(seen: true[], key: number): boolean {
+        if (seen[key]) {
+            return false;
+        }
+        seen[key] = true;
+        return true;
+    }
 }
 
 // Display-part writer helpers

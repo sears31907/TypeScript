@@ -20,10 +20,9 @@ namespace ts.codefix {
                 const nodes = getNodes(e.file, e.start);
                 if (!nodes) return;
                 const { constructor, superCall } = nodes;
-                const cls = getNodeId(constructor.parent);
-                if (seenClasses[cls]) return;
-                seenClasses[cls] = true;
-                doChange(changes, sourceFile, constructor, superCall, newLineCharacter);
+                if (addToSeen(seenClasses, getNodeId(constructor.parent))) {
+                    doChange(changes, sourceFile, constructor, superCall, newLineCharacter);
+                }
             });
         },
     });

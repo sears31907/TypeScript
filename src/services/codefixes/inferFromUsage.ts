@@ -94,16 +94,10 @@ namespace ts.codefix {
                     return getCodeActionForSetAccessor(containingFunction, sourceFile, program, cancellationToken);
                 }
                 // falls through
-            case Diagnostics.Rest_parameter_0_implicitly_has_an_any_type.code: {
-                if (seenFunctions) {
-                    const id = getNodeId(containingFunction);
-                    if (seenFunctions[id]) {
-                        return undefined;
-                    }
-                    seenFunctions[id] = true;
-                }
-                return getCodeActionForParameters(<ParameterDeclaration>token.parent, containingFunction, sourceFile, program, cancellationToken);
-            }
+            case Diagnostics.Rest_parameter_0_implicitly_has_an_any_type.code:
+                return !seenFunctions || addToSeen(seenFunctions, getNodeId(containingFunction))
+                    ? getCodeActionForParameters(<ParameterDeclaration>token.parent, containingFunction, sourceFile, program, cancellationToken)
+                    : undefined;
 
             // Get Accessor declarations
             case Diagnostics.Property_0_implicitly_has_type_any_because_its_get_accessor_lacks_a_return_type_annotation.code:
