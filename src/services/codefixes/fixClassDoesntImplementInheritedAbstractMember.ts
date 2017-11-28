@@ -40,6 +40,8 @@ namespace ts.codefix {
     }
 
     function symbolPointsToNonPrivateAndAbstractMember(symbol: Symbol): boolean {
+        // See `codeFixClassExtendAbstractProtectedProperty.ts` in https://github.com/Microsoft/TypeScript/pull/11547/files
+        // (now named `codeFixClassExtendAbstractPrivateProperty.ts`)
         const flags = getModifierFlags(first(symbol.getDeclarations()));
         return !(flags & ModifierFlags.Private) && !!(flags & ModifierFlags.Abstract);
     }
