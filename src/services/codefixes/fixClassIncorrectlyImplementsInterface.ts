@@ -8,7 +8,7 @@ namespace ts.codefix {
             const { newLineCharacter, program, sourceFile, span } = context;
             const classDeclaration = getClass(sourceFile, span.start);
             const checker = program.getTypeChecker();
-            return mapDefined<ExpressionWithTypeArguments, CodeAction>(getClassImplementsHeritageClauseElements(classDeclaration), implementedTypeNode => {
+            return mapDefined<ExpressionWithTypeArguments, CodeFix>(getClassImplementsHeritageClauseElements(classDeclaration), implementedTypeNode => {
                 const changes = textChanges.ChangeTracker.with(context, t => addMissingDeclarations(checker, implementedTypeNode, sourceFile, classDeclaration, newLineCharacter, t));
                 if (changes.length === 0) return undefined;
                 const description = formatStringFromArgs(getLocaleSpecificMessage(Diagnostics.Implement_interface_0), [implementedTypeNode.getText()]);
@@ -20,7 +20,7 @@ namespace ts.codefix {
             const seenClassDeclarations: true[] = [];
             return iterateErrorsForCodeActionAll(context, errorCodes, (changes, err) => {
                 const classDeclaration = getClass(err.file!, err.start!);
-                if (addToSeen(seenClassDeclarations, getNodeId(classDeclaration))) {
+                if (addToSeenIds(seenClassDeclarations, getNodeId(classDeclaration))) {
                     for (const implementedTypeNode of getClassImplementsHeritageClauseElements(classDeclaration)) {
                         addMissingDeclarations(context.program.getTypeChecker(), implementedTypeNode, err.file!, classDeclaration, context.newLineCharacter, changes);
                     }

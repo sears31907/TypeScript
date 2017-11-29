@@ -10,14 +10,16 @@ namespace ts.codefix {
             Diagnostics.Cannot_find_namespace_0.code,
             Diagnostics._0_refers_to_a_UMD_global_but_the_current_file_is_a_module_Consider_adding_an_import_instead.code
         ],
-        getCodeActions: getImportCodeActions
+        getCodeActions: getImportCodeActions,
+        groupIds: [],
+        fixAllInGroup: notImplemented,
     });
 
     type ImportCodeActionKind = "CodeChange" | "InsertingIntoExistingImport" | "NewImport";
     // Map from module Id to an array of import declarations in that module.
     type ImportDeclarationMap = AnyImportSyntax[][];
 
-    interface ImportCodeAction extends CodeAction {
+    interface ImportCodeAction extends CodeFix {
         kind: ImportCodeActionKind;
         moduleSpecifier?: string;
     }
@@ -155,6 +157,8 @@ namespace ts.codefix {
         return {
             description: formatMessage.apply(undefined, [undefined, description].concat(<any[]>diagnosticArgs)),
             changes,
+            // TODO: GH#20315
+            groupId: undefined,
             kind,
             moduleSpecifier
         };

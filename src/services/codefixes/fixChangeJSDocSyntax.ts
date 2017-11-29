@@ -12,15 +12,15 @@ namespace ts.codefix {
             if (!info) return undefined;
             const { typeNode, type } = info;
             const original = typeNode.getText(sourceFile);
-            const actions = [action(type, groupId_plain)];
+            const actions = [fix(type, groupId_plain)];
             if (typeNode.kind === SyntaxKind.JSDocNullableType) {
                 // for nullable types, suggest the flow-compatible `T | null | undefined`
                 // in addition to the jsdoc/closure-compatible `T | null`
-                actions.push(action(checker.getNullableType(type, TypeFlags.Undefined), groupId_nullable));
+                actions.push(fix(checker.getNullableType(type, TypeFlags.Undefined), groupId_nullable));
             }
             return actions;
 
-            function action(type: Type, groupId: string): CodeAction {
+            function fix(type: Type, groupId: string): CodeFix {
                 const newText = typeString(type, checker);
                 return {
                     description: formatStringFromArgs(getLocaleSpecificMessage(Diagnostics.Change_0_to_1), [original, newText]),
@@ -33,6 +33,7 @@ namespace ts.codefix {
         fixAllInGroup(context) {
             const { groupId, program, sourceFile } = context;
             const checker = program.getTypeChecker();
+            //use iterateErrorsForCodeActionAll helper
             const changes = mapDefinedIter(errorsIterator(program, sourceFile, errorCodes), e => {
                 const info = getInfo(e.file, e.start!, checker);
                 if (!info) return undefined;

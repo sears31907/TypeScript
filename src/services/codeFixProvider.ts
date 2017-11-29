@@ -1,11 +1,10 @@
 /* @internal */
 namespace ts {
-    export interface CodeFix {
+    export interface CodeFixRegistration {
         errorCodes: number[];
-        getCodeActions(context: CodeFixContext): CodeAction[] | undefined;
-        groupIds?: string[];
-        fixAllInGroup?(context: CodeFixAllContext): CodeActionAll;
-        //TODO: nonOptional
+        getCodeActions(context: CodeFixContext): CodeFix[] | undefined;
+        groupIds: string[];
+        fixAllInGroup(context: CodeFixAllContext): CodeActionAll;
     }
 
     //name
@@ -17,7 +16,7 @@ namespace ts {
     }
 
     export interface CodeFixAllContext extends CodeFixContextBase {
-        groupId: string;
+        groupId: {};
     }
 
     export interface CodeFixContext extends CodeFixContextBase {
@@ -26,10 +25,10 @@ namespace ts {
     }
 
     export namespace codefix {
-        const codeFixes: CodeFix[][] = [];
-        const groups = createMap<CodeFix>();
+        const codeFixes: CodeFixRegistration[][] = [];
+        const groups = createMap<CodeFixRegistration>();
 
-        export function registerCodeFix(codeFix: CodeFix) {
+        export function registerCodeFix(codeFix: CodeFixRegistration) {
             for (const error of codeFix.errorCodes) {
                 let fixes = codeFixes[error];
                 if (!fixes) {
@@ -50,9 +49,9 @@ namespace ts {
             return Object.keys(codeFixes);
         }
 
-        export function getFixes(context: CodeFixContext): CodeAction[] {
+        export function getFixes(context: CodeFixContext): CodeFix[] {
             const fixes = codeFixes[context.errorCode];
-            const allActions: CodeAction[] = [];
+            const allActions: CodeFix[] = [];
 
             forEach(fixes, f => {
                 const actions = f.getCodeActions(context);
@@ -72,8 +71,8 @@ namespace ts {
         }
 
         export function getAllFixes(context: CodeFixAllContext): CodeActionAll {
-            const fix = groups.get(context.groupId); //inline
-            return fix.fixAllInGroup!(context);
+            // Currently groupId is always a string.
+            return groups.get(cast(context.groupId, isString)).fixAllInGroup!(context);
         }
     }
 
@@ -95,6 +94,7 @@ namespace ts {
     }
 
     //mv
+    //review -- maybe always use text changes and kill this
     export function fixAllSimple(context: CodeFixAllContext, errorCodes: number[], getCodeAction: (context: CodeFixContext) => { changes: ReadonlyArray<FileTextChanges>, commands?: ReadonlyArray<CodeActionCommand> } | undefined): CodeActionAll {
         const errors = context.program.getSemanticDiagnostics();
         const allChanges = createMultiMap<TextChange>(); // file to changes

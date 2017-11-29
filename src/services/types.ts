@@ -292,8 +292,8 @@ namespace ts {
 
         getSpanOfEnclosingComment(fileName: string, position: number, onlyMultiLine: boolean): TextSpan;
 
-        getCodeFixesAtPosition(fileName: string, start: number, end: number, errorCodes: number[], formatOptions: FormatCodeSettings): CodeAction[];
-        getAllCodeFixesInGroup(fileName: string, groupId: string, formatOptions: FormatCodeSettings): CodeActionAll;
+        getCodeFixesAtPosition(fileName: string, start: number, end: number, errorCodes: number[], formatOptions: FormatCodeSettings): CodeFix[];
+        getAllCodeFixesInGroup(fileName: string, groupId: {}, formatOptions: FormatCodeSettings): CodeActionAll;
         applyCodeActionCommand(action: CodeActionCommand): Promise<ApplyCodeActionCommandResult>;
         applyCodeActionCommand(action: CodeActionCommand[]): Promise<ApplyCodeActionCommandResult[]>;
         applyCodeActionCommand(action: CodeActionCommand | CodeActionCommand[]): Promise<ApplyCodeActionCommandResult | ApplyCodeActionCommandResult[]>;
@@ -399,8 +399,6 @@ namespace ts {
     export interface CodeAction {
         /** Description of the code action to display in the UI of the editor */
         description: string;
-        //If present, this can be fixed as part of a group.
-        groupId?: {} | undefined; //todo: not optional
         /** Text changes to apply to each file as part of the code action */
         changes: FileTextChanges[];
         /**
@@ -408,6 +406,11 @@ namespace ts {
          * This allows the language service to have side effects (e.g. installing dependencies) upon a code fix.
          */
         commands?: CodeActionCommand[];
+    }
+
+    export interface CodeFix extends CodeAction {
+        /** If present, one may call 'getAllCodeFixesInGroup' with this groupId. */
+        groupId: {} | undefined;
     }
 
     export interface CodeActionAll {

@@ -9,13 +9,13 @@ namespace ts.codefix {
         fixAllInGroup: context => fixAllSimple(context, errorCodes, getCodeAction),
     });
 
-    function getCodeAction(context: CodeFixContext): CodeAction | undefined {
+    function getCodeAction(context: CodeFixContext): CodeFix | undefined {
         const { sourceFile, span: { start } } = context;
         const token = getTokenAtPosition(sourceFile, start, /*includeJsDocComment*/ false);
         if (!isStringLiteral(token)) {
             throw Debug.fail(); // These errors should only happen on the module name.
         }
-        return tryGetCodeActionForInstallPackageTypes(context.host, sourceFile.fileName, token.text);
+        return { groupId, ...tryGetCodeActionForInstallPackageTypes(context.host, sourceFile.fileName, token.text) };
     }
 
     export function tryGetCodeActionForInstallPackageTypes(host: LanguageServiceHost, fileName: string, moduleName: string): CodeAction | undefined {
@@ -31,7 +31,6 @@ namespace ts.codefix {
             description: formatStringFromArgs(getLocaleSpecificMessage(Diagnostics.Install_0), [typesPackageName]),
             changes: [],
             commands: [{ type: "install package", file: fileName, packageName: typesPackageName }],
-            groupId,
         };
     }
 }

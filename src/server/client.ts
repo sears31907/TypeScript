@@ -552,13 +552,13 @@ namespace ts.server {
             return notImplemented();
         }
 
-        getCodeFixesAtPosition(file: string, start: number, end: number, errorCodes: number[]): CodeAction[] {
+        getCodeFixesAtPosition(file: string, start: number, end: number, errorCodes: number[]): CodeFix[] {
             const args: protocol.CodeFixRequestArgs = { ...this.createFileRangeRequestArgs(file, start, end), errorCodes };
 
             const request = this.processRequest<protocol.CodeFixRequest>(CommandNames.GetCodeFixes, args);
             const response = this.processResponse<protocol.CodeFixResponse>(request);
 
-            return response.body.map(entry => this.convertCodeActions(entry, file));
+            return response.body.map(entry => this.convertCodeFix(entry, file));
         }
 
         getAllCodeFixesInGroup(): CodeActionAll {
@@ -641,14 +641,27 @@ namespace ts.server {
             });
         }
 
+        private convertCodeFix(entry: protocol.CodeFix, fileName: string): CodeFix {
+            return {
+                description: entry.description,
+                changes: this.convertChanges(entry.changes, fileName),
+                groupId: entry.groupId,
+            }
+        }
+
+        //why was this public?
         convertCodeActions(entry: protocol.CodeAction, fileName: string): CodeAction {
             return {
                 description: entry.description,
-                changes: entry.changes.map(change => ({
-                    fileName: change.fileName,
-                    textChanges: change.textChanges.map(textChange => this.convertTextChangeToCodeEdit(textChange, fileName))
-                }))
+                changes: this.convertChanges(entry.changes, fileName),
             };
+        }
+
+        private convertChanges(changes: protocol.FileCodeEdits[], fileName: string): FileTextChanges[] {
+            return changes.map(change => ({
+                fileName: change.fileName,
+                textChanges: change.textChanges.map(textChange => this.convertTextChangeToCodeEdit(textChange, fileName))
+            }));
         }
 
         convertTextChangeToCodeEdit(change: protocol.CodeEdit, fileName: string): ts.TextChange {

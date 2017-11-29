@@ -9,7 +9,7 @@ namespace ts.codefix {
         fixAllInGroup: context => fixAllSimple(context, errorCodes, getCodeAction),
     });
 
-    function getCodeAction(context: CodeFixContext): CodeAction | undefined {
+    function getCodeAction(context: CodeFixContext): CodeFix | undefined {
         const sourceFile = context.sourceFile;
         const token = getTokenAtPosition(sourceFile, context.span.start, /*includeJsDocComment*/ false);
         const qualifiedName = getAncestor(token, SyntaxKind.QualifiedName) as QualifiedName;

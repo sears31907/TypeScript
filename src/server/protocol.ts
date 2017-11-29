@@ -1568,7 +1568,7 @@ namespace ts.server.protocol {
 
     export interface CodeFixResponse extends Response {
         /** The code actions that are available */
-        body?: CodeAction[];
+        body?: CodeFix[];
     }
 
     export interface CodeAction {
@@ -1578,6 +1578,11 @@ namespace ts.server.protocol {
         changes: FileCodeEdits[];
         /** A command is an opaque object that should be passed to `ApplyCodeActionCommandRequestArgs` without modification.  */
         commands?: {}[];
+    }
+
+    export interface CodeFix extends CodeAction {
+        /** If present, one may call 'getAllCodeFixesInGroup' with this groupId. */
+        groupId: {} | undefined;
     }
 
     /**

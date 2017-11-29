@@ -1874,7 +1874,7 @@ namespace ts {
             return [];
         }
 
-        function getCodeFixesAtPosition(fileName: string, start: number, end: number, errorCodes: number[], formatOptions: FormatCodeSettings): CodeAction[] {
+        function getCodeFixesAtPosition(fileName: string, start: number, end: number, errorCodes: number[], formatOptions: FormatCodeSettings): CodeFix[] {
             synchronizeHostData();
             const sourceFile = getValidSourceFile(fileName);
             const span = createTextSpanFromBounds(start, end);
@@ -1887,7 +1887,7 @@ namespace ts {
             });
         }
 
-        function getAllCodeFixesInGroup(fileName: string, groupId: string, formatOptions: FormatCodeSettings): CodeActionAll {
+        function getAllCodeFixesInGroup(fileName: string, groupId: {}, formatOptions: FormatCodeSettings): CodeActionAll {
             synchronizeHostData();
             const sourceFile = getValidSourceFile(fileName);
             const newLineCharacter = getNewLineOrDefaultFromHost(host);

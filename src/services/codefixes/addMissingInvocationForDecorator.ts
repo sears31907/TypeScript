@@ -9,7 +9,7 @@ namespace ts.codefix {
         fixAllInGroup: context => fixAllSimple(context, errorCodes, getCodeAction),
     });
 
-    function getCodeAction(context: CodeFixContext): CodeAction {
+    function getCodeAction(context: CodeFixContext): CodeFix {
         const sourceFile = context.sourceFile;
         const token = getTokenAtPosition(sourceFile, context.span.start, /*includeJsDocComment*/ false);
         const decorator = getAncestor(token, SyntaxKind.Decorator) as Decorator;

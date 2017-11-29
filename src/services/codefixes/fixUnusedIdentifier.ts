@@ -11,7 +11,7 @@ namespace ts.codefix {
         getCodeActions(context) {
             const { sourceFile } = context;
             const token = getToken(sourceFile, context.span.start);
-            const result: CodeAction[] = [];
+            const result: CodeFix[] = [];
 
             const deletion = textChanges.ChangeTracker.with(context, t => tryDeleteDeclaration(t, sourceFile, token));
             if (deletion.length) {
@@ -41,7 +41,7 @@ namespace ts.codefix {
                     tryDeleteDeclaration(changes, sourceFile, token);
                     break;
                 default:
-                    Debug.fail(context.groupId);
+                    Debug.fail(JSON.stringify(context.groupId));
             }
         }),
     });

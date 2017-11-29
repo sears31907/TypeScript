@@ -503,7 +503,7 @@ namespace Harness.LanguageService {
         getSpanOfEnclosingComment(fileName: string, position: number, onlyMultiLine: boolean): ts.TextSpan {
             return unwrapJSONCallResult(this.shim.getSpanOfEnclosingComment(fileName, position, onlyMultiLine));
         }
-        getCodeFixesAtPosition(): ts.CodeAction[] {
+        getCodeFixesAtPosition(): never {
             throw new Error("Not supported on the shim.");
         }
         getAllCodeFixesInGroup(): never {

@@ -28,7 +28,9 @@ namespace ts.codefix {
                         length: sourceFile.checkJsDirective ? sourceFile.checkJsDirective.end - sourceFile.checkJsDirective.pos : 0
                     },
                     newText: `// @ts-nocheck${newLineCharacter}`
-                }])]
+                }])],
+                // groupId unnecessary because adding `// @ts-nocheck` only once will "fix" every error in this file anyway.
+                groupId: undefined,
             }];
         },
         groupIds: [groupId], // No point applying as a group, doing it once will fix all errors

@@ -95,7 +95,7 @@ namespace ts.codefix {
                 }
                 // falls through
             case Diagnostics.Rest_parameter_0_implicitly_has_an_any_type.code:
-                return !seenFunctions || addToSeen(seenFunctions, getNodeId(containingFunction))
+                return !seenFunctions || addToSeenIds(seenFunctions, getNodeId(containingFunction))
                     ? getCodeActionForParameters(<ParameterDeclaration>token.parent, containingFunction, sourceFile, program, cancellationToken)
                     : undefined;
 
