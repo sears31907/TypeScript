@@ -99,30 +99,17 @@ namespace ts.codefix {
     }
 
     export function createMethodFromCallExpression(callExpression: CallExpression, methodName: string, inJs: boolean, makeStatic: boolean): MethodDeclaration {
-        const parameters = createDummyParameters(callExpression.arguments.length, /*names*/ undefined, /*minArgumentCount*/ undefined, inJs);
-
-        let typeParameters: TypeParameterDeclaration[];
-        if (!inJs) {
-            const typeArgCount = length(callExpression.typeArguments);
-            for (let i = 0; i < typeArgCount; i++) {
-                const name = typeArgCount < 8 ? String.fromCharCode(CharacterCodes.T + i) : `T${i}`;
-                const typeParameter = createTypeParameterDeclaration(name, /*constraint*/ undefined, /*defaultType*/ undefined);
-                (typeParameters ? typeParameters : typeParameters = []).push(typeParameter); //just use `map` dum dum
-            }
-        }
-
-        const newMethod = createMethod(
+        return createMethod(
             /*decorators*/ undefined,
             /*modifiers*/ makeStatic ? [createToken(SyntaxKind.StaticKeyword)] : undefined,
             /*asteriskToken*/ undefined,
             methodName,
             /*questionToken*/ undefined,
-            typeParameters,
-            parameters,
+            /*typeParameters*/ inJs ? undefined : callExpression.typeArguments && callExpression.typeArguments.map((_, i) =>
+                createTypeParameterDeclaration(callExpression.typeArguments.length <= CharacterCodes.Z - CharacterCodes.T ? String.fromCharCode(CharacterCodes.T + i) : `T${i}`)),
+            /*parameters*/ createDummyParameters(callExpression.arguments.length, /*names*/ undefined, /*minArgumentCount*/ undefined, inJs),
             /*type*/ inJs ? undefined : createKeywordTypeNode(SyntaxKind.AnyKeyword),
-            createStubbedMethodBody()
-        );
-        return newMethod;
+            createStubbedMethodBody());
     }
 
     function createDummyParameters(argCount: number,  names: string[] | undefined, minArgumentCount: number | undefined, inJs: boolean): ParameterDeclaration[] {
@@ -138,7 +125,6 @@ namespace ts.codefix {
                 /*initializer*/ undefined);
             parameters.push(newParameter);
         }
-
         return parameters;
     }
 

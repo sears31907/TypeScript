@@ -180,14 +180,12 @@ namespace ts.codefix {
         return { description: formatStringFromArgs(getLocaleSpecificMessage(Diagnostics.Add_index_signature_for_property_0), [tokenName]), changes };
     }
 
-    //inline?
     function getActionForMethodDeclaration(context: CodeFixContext, classDeclarationSourceFile: SourceFile, classOpenBrace: Node, token: Identifier, callExpression: CallExpression, makeStatic: boolean, inJs: boolean): CodeAction | undefined {
         const description = formatStringFromArgs(getLocaleSpecificMessage(makeStatic ? Diagnostics.Declare_static_method_0 : Diagnostics.Declare_method_0), [token.text]);
         const changes = textChanges.ChangeTracker.with(context, t => addMethodDeclaration(t, classDeclarationSourceFile, classOpenBrace, token, callExpression, context.newLineCharacter, makeStatic, inJs));
         return { description, changes, groupId };
     }
 
-    //!
     function addMethodDeclaration(changeTracker: textChanges.ChangeTracker, classDeclarationSourceFile: SourceFile, classOpenBrace: Node, token: Identifier, callExpression: CallExpression, newLineCharacter: string, makeStatic: boolean, inJs: boolean) {
         const methodDeclaration = createMethodFromCallExpression(callExpression, token.text, inJs, makeStatic);
         changeTracker.insertNodeAfter(classDeclarationSourceFile, classOpenBrace, methodDeclaration, { suffix: newLineCharacter });
